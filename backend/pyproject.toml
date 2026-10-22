@@ -1,0 +1,39 @@
+[project]
+name = "teratai"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Leon Lau", email = "leonlau@datamicron.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "anthropic>=2.1.0",
+    "fastapi[standard]>=0.159.1",
+    "python-dotenv>=1.2.4",
+    "scikit-learn>=1.9.1",
+]
+
+[project.scripts]
+teratai = "teratai:main"
+
+[build-system]
+requires = ["uv_build>=0.11.30,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "mypy>=2.4.0",
+    "pytest>=9.1.1",
+    "ruff>=0.17.1",
+]
+
+[tool.ruff]
+line-length = 110
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
