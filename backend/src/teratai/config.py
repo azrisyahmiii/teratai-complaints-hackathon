@@ -47,6 +47,7 @@ DUPLICATE_LATEST_GAP_MINUTES = _int("DUPLICATE_LATEST_GAP_MINUTES", 10)  # 3+ id
 # Tie-break score weights, one entry per signal (a new signal is a new key, not a code change elsewhere).
 SCORE_WEIGHTS: dict[str, int] = {
     "amount_exact": 3,
+    "amount_approx": 0,  # a survivor within the approximate-amount tolerance: names a clue, adds no score
     "counterparty": 3,
     "date_exact_day": 2,
     "date_in_range": 1,
@@ -54,6 +55,12 @@ SCORE_WEIGHTS: dict[str, int] = {
     "fee_type_month": 5,
     "product_named": 3,  # fee on two accounts: the product the text names wins
 }
+
+# A UNIQUE match needs at least one of these in the winner's score breakdown: date-in-range and the channel
+# family alone fit many transactions, so on their own they never single one out.
+DISCRIMINATING_SIGNALS: frozenset[str] = frozenset(
+    {"amount_exact", "amount_approx", "counterparty", "date_exact_day", "card_last4", "fee_type_month"}
+)
 
 # Channel families by category (SPEC §4.4). `Fee` rows are matched on description; SERVICE_QUALITY has none.
 CHANNEL_FAMILIES: dict[str, tuple[str, ...]] = {

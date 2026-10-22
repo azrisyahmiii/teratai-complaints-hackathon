@@ -12,7 +12,7 @@ from collections.abc import Callable
 from datetime import date
 from decimal import Decimal
 
-from teratai import config, data, tools
+from teratai import classify, config, data, extract, tools
 from teratai.data import Txn
 from teratai.models import (
     Candidate,
@@ -128,6 +128,8 @@ def _score(t: Txn, issue: Issue, window: DateWindow, text: str) -> Candidate:
     b: dict[str, int] = {}
     if issue.amount is not None and tools.amount_matches(t.amount, issue.amount):
         b["amount_exact"] = w["amount_exact"]
+    elif issue.amount is not None and issue.amount_approx:
+        b["amount_approx"] = w["amount_approx"]  # survived the approximate-amount filter
     if counterparty_hit(t.merchant, issue.counterparty, text):
         b["counterparty"] = w["counterparty"]
     ds = _date_score(t, window)
@@ -256,12 +258,25 @@ def _rank(cands: list[Candidate]) -> list[Candidate]:
 
 
 def _decide(cands: list[Candidate]) -> tuple[str, str | None]:
-    """Unique rule: the only survivor, or a top score at least UNIQUE_MARGIN above the runner-up."""
+    """Unique rule: the only survivor, or a top score at least UNIQUE_MARGIN above the runner-up, and the
+    winner must carry at least one discriminating clue (an amount, a name, the exact day, a card, a fee type
+    and month). A lone transaction that only fits the channel and the date range is a guess: never guess."""
     if not cands:
         return "NONE", None
     if len(cands) == 1 or cands[0].score >= cands[1].score + config.UNIQUE_MARGIN:
-        return "UNIQUE", cands[0].txn_id
+        if config.DISCRIMINATING_SIGNALS & cands[0].breakdown.keys():
+            return "UNIQUE", cands[0].txn_id
+        return ("NONE" if len(cands) == 1 else "AMBIGUOUS"), None
     return "AMBIGUOUS", None
+
+
+def _low_category_confidence(u: Understanding) -> bool:
+    """The classifier alone chose the category, below tau: its label may be wrong, so no money moves on it
+    (SPEC §2 risk lean). Rules and LLM decisions are not held to tau. Goes away once the LLM tier (C11) answers."""
+    issue = u.issues[0]
+    if u.source != "classifier" or issue.category == "SCAM_TRANSFER" or not u.top3:
+        return False  # scam always ends in INVESTIGATE, so a wrong guess there pays nothing out
+    return u.top3[0][1] < classify.tau()
 
 
 def _related(txn_id: str, sibling: Txn | None) -> dict[str, str]:
@@ -293,7 +308,8 @@ def _validate_investigator(txn_id: str, row: ComplaintRow, issue: Issue, window:
     return amount is None or tools.amount_matches(t.amount, amount, tol=tol)
 
 
-def _run(row: ComplaintRow, u: Understanding, window: DateWindow, emit: Emit) -> MatchResult:
+def _run(row: ComplaintRow, u: Understanding, window: DateWindow, emit: Emit) -> tuple[MatchResult, str | None]:
+    """The match, and the reason (if any) it was held back from UNIQUE for the trace."""
     issue = u.issues[0]
     text = f"{row.subject} {row.text}"
 
@@ -304,13 +320,15 @@ def _run(row: ComplaintRow, u: Understanding, window: DateWindow, emit: Emit) ->
         )  # fmt: skip
 
     if issue.category == "SERVICE_QUALITY":
-        return result("NO_TXN", None, [], {})
+        return result("NO_TXN", None, [], {}), None
+    if extract.third_party_cue(text):
+        return result("WRONG_CUSTOMER", None, [], {}), "third_party_cue"
     if (
         issue.card_last4
         and issue.category in _CARD_CATEGORIES
         and issue.card_last4 not in tools.owned_card_last4(row.customer_id)
     ):
-        return result("WRONG_CUSTOMER", None, [], {})
+        return result("WRONG_CUSTOMER", None, [], {}), "card_not_owned"
 
     siblings: dict[str, Txn | None] = {}
     if issue.category == "FEE_DISPUTE":
@@ -322,6 +340,9 @@ def _run(row: ComplaintRow, u: Understanding, window: DateWindow, emit: Emit) ->
         cands = [_score(t, issue, window, text) for t in _survivors(row, issue, window)]
     cands = _rank(cands)
     status, txn_id = _decide(cands)
+    reason: str | None = None
+    if status == "UNIQUE" and _low_category_confidence(u):
+        status, txn_id, reason = "AMBIGUOUS", None, "low_category_confidence"
 
     if status != "UNIQUE":
         picked = _investigate(row, u, window, cands, emit)
@@ -329,16 +350,16 @@ def _run(row: ComplaintRow, u: Understanding, window: DateWindow, emit: Emit) ->
             if all(c.txn_id != picked for c in cands):
                 cands.append(Candidate(txn_id=picked, score=0, breakdown={"investigator": 0}))
             r = result("UNIQUE", picked, cands, _related(picked, siblings.get(picked)))
-            return r.model_copy(update={"source": "investigator"})
+            return r.model_copy(update={"source": "investigator"}), reason
 
     rel = _related(txn_id, siblings.get(txn_id)) if txn_id else {}
-    return result(status, txn_id, cands, rel)
+    return result(status, txn_id, cands, rel), reason
 
 
 def match_case(row: ComplaintRow, u: Understanding, window: DateWindow, emit: Emit) -> MatchResult:
     """Find the disputed transaction (SPEC §4.4). Emits one `match` StageEvent with candidates and scores."""
     t0 = time.perf_counter()
-    m = _run(row, u, window, emit)
+    m, reason = _run(row, u, window, emit)
     issue = u.issues[0]
     emit(
         StageEvent(
@@ -349,6 +370,7 @@ def match_case(row: ComplaintRow, u: Understanding, window: DateWindow, emit: Em
                 "status": m.status,
                 "txn_id": m.txn_id,
                 "source": m.source,
+                "reason": reason,
                 "category": issue.category,
                 "window": {
                     "start": window.start.isoformat(),

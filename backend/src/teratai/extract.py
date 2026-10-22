@@ -68,15 +68,84 @@ def disputed_amount(text: str) -> tuple[Decimal | None, bool]:
 
 
 # --- card last 4 -----------------------------------------------------------------------------------------
-# "(card ending 2832)", "(kad berakhir 2832)", "card hujung 2832". "account ending 1234" is the recipient's
-# account, not the customer's card, so only a card/kad prefix counts.
-_CARD_LAST4 = re.compile(r"\b(?:card|kad)\s+(?:ending(?:\s+in)?|berakhir|hujung|akhir)\s+(\d{4})\b", re.IGNORECASE)
-_CARD_LAST4_ALT = re.compile(r"(?:\*{2,}|x{2,}|last\s+4\s+digits?(?:\s+is)?)\s*(\d{4})\b", re.IGNORECASE)
+# "(card ending 2832)", "(kad berakhir 2832)", "Visa ending 9999", "kad nombor 9999", "debit card no. 8888",
+# "Mastercard 4321", "last 4 digits of the card: 5555". "account ending 1234" is the recipient's account, not the
+# customer's card, so a bare "ending" counts only when no account word comes before it.
+_CARD_WORD = r"(?:card|kad|visa|master\s?card|debit|credit|kredit)"
+_FILLER = (
+    r"(?:card|kad|number|num|no\.?|nombor|my|saya|is|ialah|yang|dengan|with|in|"
+    r"ending|berakhir|hujung|akhir|last\s+(?:4|four)\s+digits?|digits?|of\s+the\s+card)"
+)
+_NOT_DIGIT_TAIL = r"(?![\d.,:/\-]|\s*(?:hrs?|am|pm|jam|ringgit|sen|%))"
+_CARD_LAST4 = re.compile(
+    rf"\b{_CARD_WORD}\b(?:\s+{_FILLER}(?=[\s:#]))*\s*[:#]?\s*(?P<d>\d{{4}}){_NOT_DIGIT_TAIL}", re.IGNORECASE
+)
+_CARD_ENDING = re.compile(
+    r"(?<!account )(?<!akaun )(?<!acc )(?<!acct )(?<!a/c )\b(?:ending(?:\s+in|\s+with)?|berakhir(?:\s+dengan)?|hujung)"
+    rf"\s+(?P<d>\d{{4}}){_NOT_DIGIT_TAIL}",
+    re.IGNORECASE,
+)
+_CARD_LAST4_ALT = re.compile(
+    rf"(?:\*{{2,}}|x{{2,}}|last\s+(?:4|four)\s+digits?(?:\s+is)?)\s*(?P<d>\d{{4}}){_NOT_DIGIT_TAIL}", re.IGNORECASE
+)
+# A bare year is not a card number: 2024-2030 counts only after an explicit "ending" / "number" style word.
+_YEAR = re.compile(r"20(?:2\d|30)$")
+_EXPLICIT = re.compile(r"ending|berakhir|hujung|akhir|number|nombor|\bno\b|digit", re.IGNORECASE)
 
 
 def card_last4(text: str) -> str | None:
-    m = _CARD_LAST4.search(text) or _CARD_LAST4_ALT.search(text)
-    return m.group(1) if m else None
+    for rx in (_CARD_LAST4, _CARD_ENDING, _CARD_LAST4_ALT):
+        for m in rx.finditer(text):
+            d = m.group("d")
+            if _YEAR.match(d) and not _EXPLICIT.search(m.group(0)):
+                continue
+            return d
+    return None
+
+
+# --- third party (SPEC §6 "Wrong customer": "my friend's account") ------------------------------------------
+_RELATIVES = (
+    r"friend|wife|husband|spouse|partner|son|daughter|mother|father|mom|mum|dad|brother|sister|parents?|uncle|aunt|"
+    r"aunty|cousin|grandmother|grandfather|colleague|co-worker|coworker|boss|employer|neighbou?r|relative|"
+    r"girlfriend|boyfriend"
+)
+_RELATIVES_MS = (
+    r"kawan|rakan|isteri|suami|pasangan|adik|abang|kakak|ibu|bapa|ayah|mak|abah|anak|nenek|datuk|bapa\s+saudara|"
+    r"mak\s+saudara|pak\s+cik|mak\s+cik|sepupu|majikan|bos|jiran|saudara|rakan\s+sekerja"
+)
+_OWNED = r"(?:\w+\s+){0,2}?"
+_POSS_CARD = re.compile(
+    rf"\b(?:{_RELATIVES})(?:'|’)?s\s+{_OWNED}(?:card|visa|mastercard|debit)\b", re.IGNORECASE
+)
+_POSS_ACCOUNT = re.compile(rf"\b(?:{_RELATIVES})(?:'|’)?s\s+{_OWNED}(?:account|acc|acct|a/c)\b", re.IGNORECASE)
+_MS_CARD = re.compile(rf"\b(?:kad(?:\s+\w+)?)\s+(?:milik\s+)?(?:{_RELATIVES_MS})\b", re.IGNORECASE)
+_MS_ACCOUNT = re.compile(rf"\b(?:akaun|account)\s+(?:milik\s+)?(?:{_RELATIVES_MS})\b", re.IGNORECASE)
+_CARD_BELONGS = re.compile(
+    rf"\b(?:card|account|kad|akaun)\s+(?:belongs?\s+to|is\s+(?:under|in\s+the\s+name\s+of)|milik)\s+(?:my\s+)?(?:{_RELATIVES}|{_RELATIVES_MS})",
+    re.IGNORECASE,
+)
+_BEHALF = re.compile(r"on\s+behalf\s+of|bagi\s+pihak|mewakili|acting\s+for", re.IGNORECASE)
+# "to my friend's account" / "ke akaun kawan saya" is the payee of a transfer, which is the customer's own business.
+_PAYEE_LEAD = re.compile(r"\b(?:to|into|for|ke|kepada|untuk)\s+(?:(?:my|the)\s+)?$", re.IGNORECASE)
+
+
+def _is_payee(text: str, m: re.Match[str]) -> bool:
+    return _PAYEE_LEAD.search(text[max(0, m.start() - 12) : m.start()]) is not None
+
+
+def third_party_cue(text: str) -> bool:
+    """The card / account in the complaint belongs to someone else, or the writer acts for someone else.
+
+    Cues: "my friend's card", "kad kawan saya", "akaun adik saya", "on behalf of". A friend's *account* that
+    is the payee of a transfer ("to my friend's account") does not count: that is the customer's own transfer.
+    """
+    if _BEHALF.search(text) or _POSS_CARD.search(text) or _MS_CARD.search(text) or _CARD_BELONGS.search(text):
+        return True
+    for rx in (_POSS_ACCOUNT, _MS_ACCOUNT):
+        for m in rx.finditer(text):
+            if not _is_payee(text, m):
+                return True
+    return False
 
 
 # --- card in possession ----------------------------------------------------------------------------------

@@ -40,7 +40,7 @@ TARGET_ACCEPTED_ACCURACY = 0.99  # accepted (conf >= tau) OOF items must be at l
 MAX_BELOW_TAU_SHARE = 0.10  # at most this share of items may fall below tau (goes to the LLM)
 SCAM_PRECEDENCE_CONF = 0.95  # step 4: scam cue beats FAILED/UNAUTH labels below this confidence
 FOLDS = 5
-MODEL_VERSION = 1  # bump when features or hyper-parameters change, so a stale joblib is retrained
+MODEL_VERSION = 2  # bump when features or hyper-parameters change, so a stale joblib is retrained
 
 NDF = NDArray[np.float64]
 
@@ -48,7 +48,11 @@ NDF = NDArray[np.float64]
 SCAM_CUES = re.compile(
     r"\bpolis\b|\bpolice\b|\bPDRM\b|\bLHDN\b|\bmahkamah\b|\bcourt\b|\bparcel\b|\bbungkusan\b|safe account|"
     r"akaun selamat|\binvest(?:ment|ments|ing|ed|or)?\b|\bpelaburan\b|\bmelabur\b|part[- ]time|kerja sambilan|"
-    r"\blove\b|online friend|kawan online|\bkenalan\b|\btertipu\b|\bscam\w*|\btipu\b|\bmenipu\b|\bcheated\b|"
+    r"love\s+scam|romance\s+scam|online\s+(?:love|romance|lover|boyfriend|girlfriend)|"
+    r"(?:boyfriend|girlfriend|lover)\s+online|\bkekasih\b|teman\s+(?:lelaki|wanita)\s+online|"
+    r"fell\s+in\s+love|dating\s+(?:app|site)|met\s+(?:\w+\s+){1,4}?(?:on|via|through)\s+(?:facebook|instagram|tinder|"
+    r"telegram|whatsapp|wechat|bumble)|jumpa\s+(?:\w+\s+){1,4}?(?:di|melalui)\s+(?:facebook|instagram|tinder|"
+    r"telegram|whatsapp)|online friend|kawan online|\bkenalan\b|\btertipu\b|\bscam\w*|\btipu\b|\bmenipu\b|\bcheated\b|"
     r"\bcrypto\b|\bemergency\b|\bkecemasan\b|money laundering|\bharam\b",
     re.IGNORECASE,
 )
@@ -127,8 +131,14 @@ class Artifact:
     pipeline: Pipeline
     classes: list[str]
     tau: float
-    oof: dict[str, list[float]]  # complaint_id -> probabilities in `classes` order (5-fold, held out)
+    oof: dict[str, list[float]]  # oof_key(complaint_id, text) -> probabilities in `classes` order (5-fold, held out)
     stats: dict[str, Any]
+
+
+def oof_key(complaint_id: str | None, text: str) -> str:
+    """Held-out probabilities belong to one training row: its id AND its text. A live row that reuses a training
+    ID with different words is a new complaint and gets the live model."""
+    return f"{complaint_id}:{hashlib.sha1(text.encode()).hexdigest()[:16]}"
 
 
 def _training_set() -> tuple[list[str], list[str], list[str]]:
@@ -190,7 +200,7 @@ def train() -> Artifact:
         pipeline=pipe,
         classes=classes,
         tau=tau,
-        oof={i: oof[k].tolist() for k, i in enumerate(ids)},
+        oof={oof_key(i, texts[k]): oof[k].tolist() for k, i in enumerate(ids)},
         stats={
             "oof_accuracy": float(correct.mean()),
             "n": len(ids),
@@ -224,8 +234,8 @@ def tau() -> float:
 def probabilities(row: ComplaintRow) -> tuple[NDF, bool]:
     """Class probabilities (in `_artifact().classes` order) and whether they are held-out OOF values."""
     art = _artifact()
-    if config.CLASSIFY_USE_OOF and row.complaint_id in art.oof:
-        return np.array(art.oof[row.complaint_id]), True
+    if config.CLASSIFY_USE_OOF and oof_key(row.complaint_id, _text(row)) in art.oof:
+        return np.array(art.oof[oof_key(row.complaint_id, _text(row))]), True
     return art.pipeline.predict_proba([_text(row)])[0], False
 
 
@@ -329,9 +339,9 @@ def understand(row: ComplaintRow, mode: Mode, emit: Emit) -> Understanding:
 
 def _cv_report() -> None:
     art = train()
-    ids, _, y = _training_set()
+    ids, texts, y = _training_set()
     classes = art.classes
-    probs = np.array([art.oof[i] for i in ids])
+    probs = np.array([art.oof[oof_key(i, texts[k])] for k, i in enumerate(ids)])
     pred = np.array(classes)[probs.argmax(axis=1)]
     conf = probs.max(axis=1)
     y_arr = np.array(y)

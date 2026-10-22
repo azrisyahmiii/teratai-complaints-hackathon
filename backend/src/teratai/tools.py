@@ -3,7 +3,9 @@
 Two layers:
 - typed functions (`find_transactions`, ...) return dataclasses; `match.py` calls them directly;
 - `TOOLS` maps a tool name to a JSON schema + a handler taking the model's JSON args and returning a
-  JSON-able dict (money as strings). `tool_specs()` / `handlers()` plug straight into `LLMProvider.tool_loop`.
+  JSON-able dict (money as strings). `tool_specs()` / `handlers(customer_id)` plug straight into
+  `LLMProvider.tool_loop`; the handlers are bound to the case customer and answer {"error": "out of scope"}
+  for any other customer, transaction or account.
 
 No file I/O here: everything goes through `teratai.data`. The LLM only reads through these tools; code
 validates whatever it concludes.
@@ -281,17 +283,42 @@ def tool_specs() -> list[dict[str, Any]]:
     ]
 
 
-def handlers() -> dict[str, Handler]:
-    """Name -> handler map for `LLMProvider.tool_loop(handlers=...)`."""
-    return {t.name: t.handler for t in TOOLS.values()}
+OUT_OF_SCOPE: dict[str, Any] = {"error": "out of scope"}
 
 
-def call_tool(name: str, args: Args) -> dict[str, Any]:
-    """Run a tool by name. Bad arguments come back as {"error": ...} so the model can retry."""
+def _in_scope(args: Args, customer_id: str) -> bool:
+    """A call may only touch the case customer's own data (SPEC §4.4b: code bounds what the model can read)."""
+    if args.get("customer_id") not in (None, "", customer_id):
+        return False
+    tid = args.get("txn_id")
+    if tid not in (None, "") and (not data.has_txn(str(tid)) or data.txn(str(tid)).customer_id != customer_id):
+        return False
+    aid = args.get("account_id")
+    return aid in (None, "") or str(aid) in {a.account_id for a in data.accounts_for(customer_id)}
+
+
+def _scoped(tool: Tool, customer_id: str) -> Handler:
+    def run(args: Args) -> dict[str, Any]:
+        if not _in_scope(args, customer_id):
+            return dict(OUT_OF_SCOPE)
+        if "customer_id" in tool.input_schema["properties"]:
+            args = {**args, "customer_id": customer_id}  # the model may leave it out: it is always the case's
+        return tool.handler(args)
+
+    return run
+
+
+def handlers(customer_id: str) -> dict[str, Handler]:
+    """Name -> handler map for `LLMProvider.tool_loop(handlers=...)`, bound to one case's customer."""
+    return {t.name: _scoped(t, customer_id) for t in TOOLS.values()}
+
+
+def call_tool(name: str, args: Args, customer_id: str) -> dict[str, Any]:
+    """Run a tool by name for the case customer. Bad arguments come back as {"error": ...} so the model can retry."""
     tool = TOOLS.get(name)
     if tool is None:
         return {"error": f"unknown tool {name}"}
     try:
-        return tool.handler(args)
+        return _scoped(tool, customer_id)(args)
     except (ValueError, ArithmeticError, TypeError) as e:
         return {"error": str(e)}
