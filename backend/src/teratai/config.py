@@ -72,3 +72,7 @@ CHANNEL_FAMILIES: dict[str, tuple[str, ...]] = {
     "FEE_DISPUTE": ("Fee",),
     "SERVICE_QUALITY": (),
 }
+
+# --- batch (SPEC §12, §17) -----------------------------------------------------------------------
+BATCH_CONCURRENCY = _int("BATCH_CONCURRENCY", 8)
+DIST_TOLERANCE_PP = float(os.environ.get("DIST_TOLERANCE_PP", "5.0"))  # test-vs-train share shift that flags

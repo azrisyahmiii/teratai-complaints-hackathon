@@ -37,8 +37,6 @@ from teratai import config, data, pipeline
 from teratai.models import CSV_COLUMNS, AgentDecision, ComplaintRow, Emit, StageEvent
 
 DIST_FIELDS = ("category", "outcome", "route", "priority", "reply_language")
-DIST_TOLERANCE_PP = 5.0  # TODO(lead): move to config
-DEFAULT_CONCURRENCY = 8  # TODO(lead): move to config
 
 Process = Callable[[ComplaintRow, str, Emit | None], AgentDecision]
 Store = Callable[[ComplaintRow, AgentDecision], int]
@@ -149,7 +147,7 @@ def _shares(values: Sequence[str]) -> dict[str, float]:
 def dist_shifts(
     rows: Sequence[dict[str, str]],
     train_rows: Sequence[dict[str, str]],
-    tolerance_pp: float = DIST_TOLERANCE_PP,
+    tolerance_pp: float = config.DIST_TOLERANCE_PP,
 ) -> list[Shift]:
     """Every (field, value) whose share in `rows` differs from `train_rows` by more than `tolerance_pp`."""
     out: list[Shift] = []
@@ -175,14 +173,14 @@ def format_dist(rows: Sequence[dict[str, str]], train_rows: Sequence[dict[str, s
     shifts = dist_shifts(rows, train_rows)
     if shifts:
         lines.append(
-            f"  FLAG: {len(shifts)} share(s) differ by more than {DIST_TOLERANCE_PP:.0f} pp (run/train):"
+            f"  FLAG: {len(shifts)} share(s) differ by more than {config.DIST_TOLERANCE_PP:.0f} pp (run/train):"
         )
         lines += [
             f"    {s.field}={s.value}: {s.run_pct:.1f} vs {s.train_pct:.1f} ({s.diff_pp:+.1f} pp)"
             for s in shifts
         ]
     else:
-        lines.append(f"  OK: every share within {DIST_TOLERANCE_PP:.0f} pp of training")
+        lines.append(f"  OK: every share within {config.DIST_TOLERANCE_PP:.0f} pp of training")
     return "\n".join(lines)
 
 
@@ -215,7 +213,7 @@ def run_batch(
     ids: Sequence[str],
     run_id: str,
     *,
-    concurrency: int = DEFAULT_CONCURRENCY,
+    concurrency: int = config.BATCH_CONCURRENCY,
     fresh: bool = False,
     persist: bool = False,
     process: Process = pipeline.process_complaint,
@@ -328,7 +326,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     ap.add_argument("--ids", required=True, help="CSV with a complaint_id column, or a comma list of IDs")
     ap.add_argument("--run", required=True, help="run id (not 'live')")
     ap.add_argument("--out", type=Path, help="predictions CSV to write")
-    ap.add_argument("--concurrency", type=int, default=DEFAULT_CONCURRENCY)
+    ap.add_argument("--concurrency", type=int, default=config.BATCH_CONCURRENCY)
     ap.add_argument("--replies", choices=("template", "llm"), default="llm", help="sets env REPLY_MODE")
     ap.add_argument("--persist", action="store_true", help="call pipeline.store for every row")
     ap.add_argument("--fresh", action="store_true", help="ignore and delete the run's checkpoint")
