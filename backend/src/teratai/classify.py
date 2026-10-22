@@ -5,7 +5,8 @@ Tiers
   precedence (decision step 4).
 - Tier 1 (code, trained on labels_train.csv): char + word TF-IDF -> LogisticRegression. Confidence threshold
   `tau` is chosen from 5-fold out-of-fold (OOF) probabilities.
-- Tier 2 (LLM, C11): `_llm_extract` is the hook. Without it the classifier label stands (decision step 2).
+- Tier 2 (LLM, C11): `_llm_extract` calls `extract.llm_issue`; live mode always, batch when conf < tau or Tier 0 and
+  Tier 1 disagree. If the LLM is unavailable the classifier label and the regex clues stand (degraded).
 
 Training-set honesty: for a labelled training complaint, `understand` uses that complaint's OOF probabilities,
 never the in-sample model, so train scores are not inflated (env CLASSIFY_USE_OOF=0 turns this off).
@@ -250,24 +251,37 @@ def _top3(probs: NDF, classes: list[str], first: str | None = None) -> list[tupl
 
 
 def decide_category(
-    probs: NDF, classes: list[str], scam_cue: bool, threshold: float
+    probs: NDF, classes: list[str], scam_cue: bool, threshold: float, llm_label: str | None = None
 ) -> tuple[Category, str, str]:
-    """(category, source, reason) from classifier probabilities and the Tier 0 scam cue. No LLM here.
+    """(category, source, reason) from classifier probabilities, the Tier 0 scam cue and the LLM label (if any).
 
     1. conf >= tau and no Tier 0 conflict -> the classifier label.
-    2. otherwise the LLM decides (hook, C11); without it the classifier label stands.
-    4. scam precedence: a scam cue and a FAILED_TRANSFER / UNAUTHORISED_CARD label below 0.95 -> SCAM_TRANSFER.
+    2. otherwise the LLM label, except that the classifier wins when they disagree and its conf >= 0.95.
+       Without an LLM label the classifier label stands.
+    4. scam precedence: a scam cue and a FAILED_TRANSFER / UNAUTHORISED_CARD result whose classifier probability
+       is below 0.95 -> SCAM_TRANSFER.
     Step 3 (evidence consistency after matching) lives in the pipeline, not here.
+    `source` is "llm" only when the LLM was consulted in step 2 and its label is the one used.
     """
     k = int(probs.argmax())
     label, conf = classes[k], float(probs[k])
-    if scam_cue and label in ("FAILED_TRANSFER", "UNAUTHORISED_CARD") and conf < SCAM_PRECEDENCE_CONF:
-        return "SCAM_TRANSFER", "rules", f"scam cue overrides {label} (conf {conf:.2f} < {SCAM_PRECEDENCE_CONF})"
     conflict = scam_cue and label != "SCAM_TRANSFER"
+    chosen, source = label, "classifier"
     if conf >= threshold and not conflict:
-        return label, "classifier", f"classifier conf {conf:.2f} >= tau {threshold:.2f}"  # type: ignore[return-value]
-    why = "scam cue vs " + label if conflict else f"conf {conf:.2f} < tau {threshold:.2f}"
-    return label, "classifier", f"{why}; LLM tier not available, classifier label kept"  # type: ignore[return-value]
+        reason = f"classifier conf {conf:.2f} >= tau {threshold:.2f}"
+    else:
+        why = "scam cue vs " + label if conflict else f"conf {conf:.2f} < tau {threshold:.2f}"
+        if llm_label is None:
+            reason = f"{why}; LLM tier not available, classifier label kept"
+        elif llm_label != label and conf >= SCAM_PRECEDENCE_CONF:
+            reason = f"{why}; LLM said {llm_label} but classifier conf {conf:.2f} >= {SCAM_PRECEDENCE_CONF}"
+        else:
+            chosen, source = llm_label, "llm"
+            reason = f"{why}; LLM label {llm_label}" + (f" (classifier said {label})" if llm_label != label else "")
+    chosen_conf = float(probs[classes.index(chosen)]) if chosen in classes else 0.0
+    if scam_cue and chosen in ("FAILED_TRANSFER", "UNAUTHORISED_CARD") and chosen_conf < SCAM_PRECEDENCE_CONF:
+        return "SCAM_TRANSFER", "rules", f"scam cue overrides {chosen} (conf {chosen_conf:.2f} < {SCAM_PRECEDENCE_CONF})"
+    return chosen, source, reason  # type: ignore[return-value]
 
 
 def _needs_llm(mode: Mode, probs: NDF, scam_cue: bool, classes: list[str], threshold: float) -> str | None:
@@ -282,9 +296,33 @@ def _needs_llm(mode: Mode, probs: NDF, scam_cue: bool, classes: list[str], thres
     return None
 
 
-def _llm_extract(row: ComplaintRow, base: Understanding, reason: str) -> Understanding | None:
-    """Hook for the LLM extraction tier (C11). Returns None until it is wired in; then `base` is used as is."""
-    return None
+def _llm_extract(
+    row: ComplaintRow, base: Understanding, reason: str, emit: Emit | None = None
+) -> extract.LLMExtraction | None:
+    """Tier 2 hook (SPEC §4.2): ask Haiku for category + clues. None = LLM unavailable (degraded event emitted)
+    and the regex path stands. `base` is the code-only understanding, `reason` why the tier runs (trace)."""
+    return extract.llm_issue(row, emit)
+
+
+def _merge_llm(
+    row: ComplaintRow, base: Understanding, llm: extract.LLMExtraction, probs: NDF, classes: list[str],
+    threshold: float,
+) -> tuple[Understanding, str]:
+    """Fold the LLM answer into the understanding: category per decide_category, clues merged, language stays code."""
+    first = llm.issues[0]
+    injection = base.injection_suspected or llm.injection_suspected
+    category, source, reason = decide_category(probs, classes, base.scam_cue, threshold, llm_label=first.category)
+    text = f"{row.subject} {row.text}".strip()
+    issue = extract.merge_issue(extract.regex_issue(row, category), first, text, category, injection)
+    merged = base.model_copy(
+        update={
+            "issues": [issue],
+            "source": source,
+            "injection_suspected": injection,
+            "top3": _top3(probs, classes, first=category),
+        }
+    )
+    return merged, reason
 
 
 def understand(row: ComplaintRow, mode: Mode, emit: Emit) -> Understanding:
@@ -306,9 +344,20 @@ def understand(row: ComplaintRow, mode: Mode, emit: Emit) -> Understanding:
         scam_cue=t0r.scam_cue,
     )
     llm_reason = _needs_llm(mode, probs, t0r.scam_cue, art.classes, threshold)
-    result = base
+    result, llm_called, llm_note = base, False, None
     if llm_reason is not None:
-        result = _llm_extract(row, base, llm_reason) or base
+        llm = _llm_extract(row, base, llm_reason, emit)
+        llm_called = llm is not None
+        if llm is not None:
+            result, reason = _merge_llm(row, base, llm, probs, art.classes, threshold)
+            llm_note = {
+                "category": llm.issues[0].category,
+                "language": llm.language,
+                "is_complaint": llm.is_complaint,
+                "injection_suspected": llm.injection_suspected,
+                "issues": len(llm.issues),
+                "attempts": llm.attempts,
+            }
     emit(
         StageEvent(
             stage="understand",
@@ -322,6 +371,9 @@ def understand(row: ComplaintRow, mode: Mode, emit: Emit) -> Understanding:
                 "oof_probabilities": held_out,
                 "llm_reason": llm_reason,
                 "llm_used": result.source == "llm",
+                "llm_called": llm_called,
+                "llm": llm_note,
+                "degraded": llm_reason is not None and not llm_called,
                 "clues": result.issues[0].model_dump(mode="json"),
                 "language": result.language,
                 "language_reason": result.language_reason,

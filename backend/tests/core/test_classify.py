@@ -143,7 +143,7 @@ def test_scam_precedence_step_4() -> None:
 def test_llm_hook_is_called_in_live_mode(monkeypatch: pytest.MonkeyPatch) -> None:
     seen: list[str] = []
 
-    def spy(row: ComplaintRow, base: object, reason: str) -> None:
+    def spy(row: ComplaintRow, base: object, reason: str, emit: object = None) -> None:
         seen.append(reason)
 
     monkeypatch.setattr(classify, "_llm_extract", spy)
