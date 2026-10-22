@@ -23,6 +23,105 @@ new complaint ──► 1. UNDERSTAND (LLM) ──► 2. FIND THE TRANSACTION (c
 
 Steps 2, 3 and 5 are deterministic: you can test them against `labels_train.csv` without calling an LLM. That's where most of the points are.
 
+## The API
+
+The live round reaches your agent through the API in [`api.md`](api.md). The simplest shape: accept the complaint, decide in the background, serve the case, and let a human act on cases waiting for approval. This FastAPI version is a working starting point; plug in your agent as `handle_complaint` and your reply check as `self_check` (see `starter/check_reply.py`). Point your own UI's Approve and Reject buttons at `POST /cases/{id}/actions` too:
+
+```python
+# app.py, run with: uvicorn app:app --host 0.0.0.0 --port 8000
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
+from typing import Literal, Optional
+
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+
+app = FastAPI()
+CASES: dict[str, dict] = {}            # use a database in your real build
+POOL = ThreadPoolExecutor(max_workers=8)
+STATE = {"AUTO_RESOLVE": ("auto_resolved", True), "HUMAN_APPROVAL": ("awaiting_approval", False),
+         "FRAUD_TEAM": ("with_fraud_team", False)}
+
+
+class Complaint(BaseModel):
+    complaint_id: str
+    customer_id: str
+    received_at: str
+    channel: str = ""
+    subject: str = ""
+    text: str                           # missing text: FastAPI answers 422 for you
+
+
+class Action(BaseModel):
+    action: Literal["approve", "reject", "edit_approve"]   # anything else: 422
+    actor: str
+    reason: str = ""
+    reply_text: Optional[str] = None
+
+
+def work(c: Complaint):
+    try:
+        decision = handle_complaint(c.model_dump())   # your agent: category, matched_txn_id, outcome, ..., reply_text, self_check
+        state, sent = STATE[decision["route"]]
+        CASES[c.complaint_id] = {"complaint_id": c.complaint_id, "status": "done", **decision,
+                                 "case_state": state, "sent": sent, "human_action": None}
+        # if sent: put decision["reply_text"] in your outbox
+    except Exception as e:
+        CASES[c.complaint_id] = {"complaint_id": c.complaint_id, "status": "error", "error": str(e)}
+
+
+@app.post("/complaints", status_code=202)
+def new_complaint(c: Complaint):
+    if c.complaint_id in CASES:                    # the same complaint again: no second case
+        return {"complaint_id": c.complaint_id, "status": CASES[c.complaint_id]["status"]}
+    if not c.text.strip():
+        raise HTTPException(422, "text is empty")
+    CASES[c.complaint_id] = {"complaint_id": c.complaint_id, "status": "processing"}
+    POOL.submit(work, c)
+    return {"complaint_id": c.complaint_id, "status": "processing"}
+
+
+@app.get("/cases/{complaint_id}")
+def get_case(complaint_id: str):
+    if complaint_id not in CASES:
+        raise HTTPException(404, "unknown complaint")
+    return CASES[complaint_id]
+
+
+@app.post("/cases/{complaint_id}/actions")
+def act(complaint_id: str, a: Action):
+    case = CASES.get(complaint_id)
+    if case is None:
+        raise HTTPException(404, "unknown complaint")
+    if case.get("case_state") != "awaiting_approval":
+        raise HTTPException(409, f"case is {case.get('case_state')}, not awaiting_approval")
+    if not a.actor.strip():
+        raise HTTPException(422, "actor is required")
+    reply = case["reply_text"]
+    if a.action == "edit_approve":
+        if not a.reply_text or self_check(complaint_id, a.reply_text):   # your self-check: returns the problems found
+            raise HTTPException(422, "edited reply is missing or fails the self-check")
+        reply = a.reply_text
+    approved = a.action != "reject"
+    case.update(case_state="approved" if approved else "rejected", sent=approved,   # the agent's fields stay as they were
+                human_action={"action": a.action, "actor": a.actor, "reason": a.reason,
+                              "at": datetime.now().isoformat(sep=" ", timespec="seconds"), "reply_text": reply})
+    # if approved: put reply in your outbox
+    return case
+
+
+@app.get("/health")
+def health():
+    return {"ok": True}
+```
+
+Use the same `handle_complaint` for the 750 test complaints (read `complaints.csv` and call it for each `test_ids.csv` row), so the live round tests the system you scored. Then check the service:
+
+```bash
+uvicorn app:app --host 0.0.0.0 --port 8000
+python scoring/api_check.py http://localhost:8000
+```
+
 ## Where to use the LLM and where to use code
 
 | Task | Use | Why |

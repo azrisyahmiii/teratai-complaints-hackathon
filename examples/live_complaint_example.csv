@@ -1,0 +1,2 @@
+complaint_id,customer_id,received_at,channel,subject,text
+CMP-00244,CUS-02394,2026-07-20 22:32,Email,ATM did not dispense cash,"Hello, the machine did not dispense all of the cash when I withdrew about RM1,500 last Friday, but the whole amount was deducted. Please resolve this quickly."

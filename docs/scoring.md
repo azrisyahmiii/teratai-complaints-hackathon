@@ -40,7 +40,7 @@ Each complaint earns up to 100 points:
 
 **Final score = mean points × (1 − 2 × critical error rate)**, never below 0. Example: a mean of 90 with 3% critical errors gives 90 × 0.94 = 84.6.
 
-`route` and `reply_text` aren't in the automatic score. Judges check routing in the live round and read a sample of 10 replies per team.
+`route` and `reply_text` aren't in the automatic score. Judges check routing in the live round and read a sample of 10 replies per team. We also run automatic checks on all your replies and give the results to the judges: empty replies, replies in the wrong language, transaction IDs or RM amounts that aren't in the customer's evidence (the same check as `starter/check_reply.py`), and whether a refund reply states the refund amount.
 
 Score yourself on the training labels at any time:
 
@@ -55,10 +55,14 @@ python scoring/score.py submissions/<team>/predictions.csv data/labels_train.csv
 | Weight | Criterion |
 |---|---|
 | 30% | Leaderboard score on the test set |
-| 25% | Agent design and guardrails, checked in the live round: routing and approvals, reacting to new complaints on its own, the self-check catching bad replies |
+| 25% | Live round: **hidden test (15)**, 20 unseen complaints sent to your API and scored automatically (score × 0.15); **human gate (10)**, judges watch 3 complaints end to end (routing, approvals that hold, fraud queue, self-check) |
 | 25% | Business value and demo: reply quality (tone, correct language, no invented facts), clarity, would a bank use it |
 | 20% | Engineering: architecture, observability (show why it decided), cost and speed per complaint |
 
 ### The live round
 
-During your demo the judges give you 2 or 3 new complaints in the same format as a row of `complaints.csv` (`complaint_id, customer_id, received_at, channel, subject, text`, with IDs `LIVE-01`… and `received_at` on 30 Sep 2026). The customers and transactions they refer to are already in the data. Your intake must accept them without code changes. We look for the right decision and the right route. Cases that need approval must wait for approval, and fraud cases must land with the fraud team. The reply must pass your own self-check.
+Both parts go through your API ([`api.md`](api.md)).
+
+**Hidden test (15 points).** Right after the 15:00 freeze, `scoring/api_check.py` sends 20 complaints you haven't seen to your API, all at once, and scores them with the same per-complaint points and critical-error rule as the leaderboard; your hidden-test points are that score × 0.15. The complaints are about customers and transactions already in the data, written the way real customers write (typos, SMS short forms, emoji, mixed language), each with its own `received_at`. A complaint that isn't `done` within 120 seconds scores 0. The script also checks that each case's `case_state` and `sent` match its route, runs robustness probes (health check, unknown case, missing text, unknown customer, the same complaint twice) and human-in-the-loop probes (a case waiting for approval holds, an edited reply with an invented amount is refused, an approval is recorded without changing the agent's decision), and times each complaint; those results go to the judges for the engineering score. Run it on yourself: `python scoring/api_check.py http://localhost:8000`.
+
+**Human gate (10 points).** In your demo (from 16:30), the judges send 3 more complaints, one at a time, and tick a checklist for each: the case appears on its own; the right transaction, decision and refund; the right route; a case needing approval waits until someone approves it in your system; a fraud case lands in the fraud queue; the reply is in the right language and consistent with the decision; the self-check result is visible. Through the API we also check that a case waiting for approval shows `case_state: awaiting_approval` and `sent: false` until it is approved ([`api.md`](api.md#case-states-human-in-the-loop)). Your points are the share of checks passed × 10.
