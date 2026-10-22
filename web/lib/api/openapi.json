@@ -1,0 +1,1519 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Teratai complaints agent",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_api_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Health Api Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/complaints": {
+      "post": {
+        "summary": "Create Complaint",
+        "operationId": "create_complaint_api_complaints_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComplaintRow"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseCreated"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cases": {
+      "get": {
+        "summary": "List Cases",
+        "operationId": "list_cases_api_cases_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CaseSummary"
+                  },
+                  "type": "array",
+                  "title": "Response List Cases Api Cases Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cases/{case_id}": {
+      "get": {
+        "summary": "Get Case",
+        "operationId": "get_case_api_cases__case_id__get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AgentDecision": {
+        "properties": {
+          "complaint_id": {
+            "type": "string",
+            "title": "Complaint Id"
+          },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "customer_id": {
+            "type": "string",
+            "title": "Customer Id"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "DUPLICATE_CHARGE",
+              "FAILED_TRANSFER",
+              "ATM_NOT_DISPENSED",
+              "UNAUTHORISED_CARD",
+              "SCAM_TRANSFER",
+              "FEE_DISPUTE",
+              "SERVICE_QUALITY"
+            ],
+            "title": "Category"
+          },
+          "category_conf": {
+            "type": "number",
+            "title": "Category Conf"
+          },
+          "matched_txn_id": {
+            "type": "string",
+            "title": "Matched Txn Id"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "REFUND",
+              "DECLINE",
+              "INVESTIGATE",
+              "INFO_ONLY"
+            ],
+            "title": "Outcome"
+          },
+          "refund_amount_myr": {
+            "type": "string",
+            "title": "Refund Amount Myr"
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "P1",
+              "P2",
+              "P3"
+            ],
+            "title": "Priority"
+          },
+          "reply_language": {
+            "type": "string",
+            "enum": [
+              "EN",
+              "MS"
+            ],
+            "title": "Reply Language"
+          },
+          "route": {
+            "type": "string",
+            "enum": [
+              "AUTO_RESOLVE",
+              "HUMAN_APPROVAL",
+              "FRAUD_TEAM"
+            ],
+            "title": "Route"
+          },
+          "reply_text": {
+            "type": "string",
+            "title": "Reply Text"
+          },
+          "check_ok": {
+            "type": "boolean",
+            "title": "Check Ok"
+          },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Flags"
+          },
+          "understanding": {
+            "$ref": "#/components/schemas/Understanding"
+          },
+          "match": {
+            "$ref": "#/components/schemas/MatchResult"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/Decision"
+          },
+          "facts": {
+            "$ref": "#/components/schemas/FactSheet"
+          },
+          "reply": {
+            "$ref": "#/components/schemas/Reply"
+          }
+        },
+        "type": "object",
+        "required": [
+          "complaint_id",
+          "run_id",
+          "customer_id",
+          "category",
+          "category_conf",
+          "matched_txn_id",
+          "outcome",
+          "refund_amount_myr",
+          "priority",
+          "reply_language",
+          "route",
+          "reply_text",
+          "check_ok",
+          "flags",
+          "understanding",
+          "match",
+          "decision",
+          "facts",
+          "reply"
+        ],
+        "title": "AgentDecision",
+        "description": "Immutable (SPEC \u00a74.8). The predictions.csv row comes only from this.\n\nWRONG_CUSTOMER (\u00a76): match.status says so, flags has \"wrong_customer\", reply_text \"\";\nthe CSV row uses the \u00a76 NEEDS_INFO defaults."
+      },
+      "Candidate": {
+        "properties": {
+          "txn_id": {
+            "type": "string",
+            "title": "Txn Id"
+          },
+          "score": {
+            "type": "integer",
+            "title": "Score"
+          },
+          "breakdown": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Breakdown"
+          }
+        },
+        "type": "object",
+        "required": [
+          "txn_id",
+          "score",
+          "breakdown"
+        ],
+        "title": "Candidate"
+      },
+      "CaseCreated": {
+        "properties": {
+          "case_id": {
+            "type": "integer",
+            "title": "Case Id"
+          },
+          "complaint_id": {
+            "type": "string",
+            "title": "Complaint Id"
+          },
+          "existing": {
+            "type": "boolean",
+            "title": "Existing"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "complaint_id",
+          "existing"
+        ],
+        "title": "CaseCreated"
+      },
+      "CaseDetail": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "complaint_id": {
+            "type": "string",
+            "title": "Complaint Id"
+          },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "customer_id": {
+            "type": "string",
+            "title": "Customer Id"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "DUPLICATE_CHARGE",
+                  "FAILED_TRANSFER",
+                  "ATM_NOT_DISPENSED",
+                  "UNAUTHORISED_CARD",
+                  "SCAM_TRANSFER",
+                  "FEE_DISPUTE",
+                  "SERVICE_QUALITY"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "P1",
+                  "P2",
+                  "P3"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority"
+          },
+          "route": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "AUTO_RESOLVE",
+                  "HUMAN_APPROVAL",
+                  "FRAUD_TEAM"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Route"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "escalated",
+              "approved",
+              "rejected",
+              "sent",
+              "investigating",
+              "closed",
+              "needs_info"
+            ],
+            "title": "Status"
+          },
+          "refund_amount_myr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refund Amount Myr"
+          },
+          "reply_language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "EN",
+                  "MS"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply Language"
+          },
+          "assigned_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned To"
+          },
+          "ack_due": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ack Due"
+          },
+          "resolve_due": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolve Due"
+          },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Flags"
+          },
+          "row": {
+            "$ref": "#/components/schemas/ComplaintRow"
+          },
+          "agent_decision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentDecision"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "final_action": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Action"
+          },
+          "check_ok": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Check Ok"
+          },
+          "check_issues": {
+            "items": {
+              "$ref": "#/components/schemas/CheckIssue"
+            },
+            "type": "array",
+            "title": "Check Issues"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/CaseEvent"
+            },
+            "type": "array",
+            "title": "Events"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "complaint_id",
+          "run_id",
+          "customer_id",
+          "category",
+          "priority",
+          "route",
+          "status",
+          "refund_amount_myr",
+          "reply_language",
+          "assigned_to",
+          "ack_due",
+          "resolve_due",
+          "flags",
+          "row",
+          "agent_decision",
+          "final_action",
+          "check_ok",
+          "check_issues",
+          "events"
+        ],
+        "title": "CaseDetail"
+      },
+      "CaseEvent": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "case_id": {
+            "type": "integer",
+            "title": "Case Id"
+          },
+          "ts": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ts"
+          },
+          "actor": {
+            "type": "string",
+            "title": "Actor"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage"
+          },
+          "field": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field"
+          },
+          "old_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Old Value"
+          },
+          "new_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Value"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Payload",
+            "default": {}
+          },
+          "tool_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Name"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "tokens_in": {
+            "type": "integer",
+            "title": "Tokens In",
+            "default": 0
+          },
+          "tokens_out": {
+            "type": "integer",
+            "title": "Tokens Out",
+            "default": 0
+          },
+          "cost_usd": {
+            "type": "string",
+            "title": "Cost Usd",
+            "default": "0"
+          },
+          "latency_ms": {
+            "type": "integer",
+            "title": "Latency Ms",
+            "default": 0
+          },
+          "ok": {
+            "type": "boolean",
+            "title": "Ok",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "case_id",
+          "ts",
+          "actor",
+          "action"
+        ],
+        "title": "CaseEvent",
+        "description": "One case_events row (SPEC \u00a710): agent stage or human action."
+      },
+      "CaseSummary": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "complaint_id": {
+            "type": "string",
+            "title": "Complaint Id"
+          },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "customer_id": {
+            "type": "string",
+            "title": "Customer Id"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "DUPLICATE_CHARGE",
+                  "FAILED_TRANSFER",
+                  "ATM_NOT_DISPENSED",
+                  "UNAUTHORISED_CARD",
+                  "SCAM_TRANSFER",
+                  "FEE_DISPUTE",
+                  "SERVICE_QUALITY"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "P1",
+                  "P2",
+                  "P3"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority"
+          },
+          "route": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "AUTO_RESOLVE",
+                  "HUMAN_APPROVAL",
+                  "FRAUD_TEAM"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Route"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "escalated",
+              "approved",
+              "rejected",
+              "sent",
+              "investigating",
+              "closed",
+              "needs_info"
+            ],
+            "title": "Status"
+          },
+          "refund_amount_myr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refund Amount Myr"
+          },
+          "reply_language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "EN",
+                  "MS"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply Language"
+          },
+          "assigned_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned To"
+          },
+          "ack_due": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ack Due"
+          },
+          "resolve_due": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolve Due"
+          },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Flags"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "complaint_id",
+          "run_id",
+          "customer_id",
+          "category",
+          "priority",
+          "route",
+          "status",
+          "refund_amount_myr",
+          "reply_language",
+          "assigned_to",
+          "ack_due",
+          "resolve_due",
+          "flags"
+        ],
+        "title": "CaseSummary"
+      },
+      "CheckIssue": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "TXN_ID",
+              "AMOUNT",
+              "OUTCOME",
+              "LANGUAGE",
+              "HYGIENE",
+              "PHONE_URL",
+              "DATE"
+            ],
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "CheckIssue"
+      },
+      "CheckResult": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/CheckIssue"
+            },
+            "type": "array",
+            "title": "Issues"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok",
+          "issues"
+        ],
+        "title": "CheckResult"
+      },
+      "ComplaintRow": {
+        "properties": {
+          "complaint_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Complaint Id"
+          },
+          "customer_id": {
+            "type": "string",
+            "title": "Customer Id"
+          },
+          "received_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Received At"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "App chat",
+              "Email",
+              "Call centre note",
+              "Branch form",
+              "Social media DM"
+            ],
+            "title": "Channel"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject",
+            "default": ""
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "customer_id",
+          "received_at",
+          "channel",
+          "text"
+        ],
+        "title": "ComplaintRow",
+        "description": "One complaints.csv row."
+      },
+      "DateWindow": {
+        "properties": {
+          "start": {
+            "type": "string",
+            "format": "date",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date",
+            "title": "End"
+          },
+          "exact_day": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exact Day"
+          },
+          "phrase": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phrase"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "end"
+        ],
+        "title": "DateWindow",
+        "description": "SPEC \u00a74.3: inclusive search window; exact_day scores higher."
+      },
+      "Decision": {
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "REFUND",
+              "DECLINE",
+              "INVESTIGATE",
+              "INFO_ONLY"
+            ],
+            "title": "Outcome"
+          },
+          "refund_myr": {
+            "type": "string",
+            "title": "Refund Myr"
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "P1",
+              "P2",
+              "P3"
+            ],
+            "title": "Priority"
+          },
+          "route": {
+            "type": "string",
+            "enum": [
+              "AUTO_RESOLVE",
+              "HUMAN_APPROVAL",
+              "FRAUD_TEAM"
+            ],
+            "title": "Route"
+          },
+          "needs_info": {
+            "type": "boolean",
+            "title": "Needs Info"
+          },
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "rule_text": {
+            "type": "string",
+            "title": "Rule Text"
+          },
+          "inputs": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Inputs"
+          },
+          "calc": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "outcome",
+          "refund_myr",
+          "priority",
+          "route",
+          "needs_info",
+          "rule_id",
+          "rule_text",
+          "inputs"
+        ],
+        "title": "Decision"
+      },
+      "FactSheet": {
+        "properties": {
+          "customer_name": {
+            "type": "string",
+            "title": "Customer Name"
+          },
+          "honorific": {
+            "type": "string",
+            "title": "Honorific"
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "EN",
+              "MS"
+            ],
+            "title": "Language"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "DUPLICATE_CHARGE",
+              "FAILED_TRANSFER",
+              "ATM_NOT_DISPENSED",
+              "UNAUTHORISED_CARD",
+              "SCAM_TRANSFER",
+              "FEE_DISPUTE",
+              "SERVICE_QUALITY"
+            ],
+            "title": "Category"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "REFUND",
+              "DECLINE",
+              "INVESTIGATE",
+              "INFO_ONLY"
+            ],
+            "title": "Outcome"
+          },
+          "refund_myr": {
+            "type": "string",
+            "title": "Refund Myr"
+          },
+          "ids": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Ids"
+          },
+          "amounts": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Amounts"
+          },
+          "dates": {
+            "additionalProperties": {
+              "type": "string",
+              "format": "date"
+            },
+            "type": "object",
+            "title": "Dates"
+          },
+          "sla_days": {
+            "type": "integer",
+            "title": "Sla Days"
+          }
+        },
+        "type": "object",
+        "required": [
+          "customer_name",
+          "honorific",
+          "language",
+          "category",
+          "outcome",
+          "refund_myr",
+          "ids",
+          "amounts",
+          "dates",
+          "sla_days"
+        ],
+        "title": "FactSheet"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "Issue": {
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": [
+              "DUPLICATE_CHARGE",
+              "FAILED_TRANSFER",
+              "ATM_NOT_DISPENSED",
+              "UNAUTHORISED_CARD",
+              "SCAM_TRANSFER",
+              "FEE_DISPUTE",
+              "SERVICE_QUALITY"
+            ],
+            "title": "Category"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          },
+          "amount_approx": {
+            "type": "boolean",
+            "title": "Amount Approx",
+            "default": false
+          },
+          "counterparty": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Counterparty"
+          },
+          "date_phrase": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Phrase"
+          },
+          "card_last4": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Card Last4"
+          },
+          "fee_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "monthly_service",
+                  "debit_annual",
+                  "cc_annual"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fee Type"
+          },
+          "fee_month": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fee Month"
+          },
+          "card_in_possession": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Card In Possession"
+          }
+        },
+        "type": "object",
+        "required": [
+          "category"
+        ],
+        "title": "Issue",
+        "description": "SPEC \u00a74.2 extraction schema, one per issue."
+      },
+      "MatchResult": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "UNIQUE",
+              "NONE",
+              "AMBIGUOUS",
+              "WRONG_CUSTOMER",
+              "NO_TXN"
+            ],
+            "title": "Status"
+          },
+          "txn_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Txn Id"
+          },
+          "window": {
+            "$ref": "#/components/schemas/DateWindow"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/Candidate"
+            },
+            "type": "array",
+            "title": "Candidates"
+          },
+          "related": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Related"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "matcher",
+              "investigator"
+            ],
+            "title": "Source"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "txn_id",
+          "window",
+          "candidates",
+          "related",
+          "source"
+        ],
+        "title": "MatchResult"
+      },
+      "Reply": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "llm",
+              "redraft",
+              "template"
+            ],
+            "title": "Source"
+          },
+          "check": {
+            "$ref": "#/components/schemas/CheckResult"
+          },
+          "drafts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Drafts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text",
+          "source",
+          "check",
+          "drafts"
+        ],
+        "title": "Reply"
+      },
+      "Understanding": {
+        "properties": {
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/Issue"
+            },
+            "type": "array",
+            "title": "Issues"
+          },
+          "top3": {
+            "items": {
+              "prefixItems": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "DUPLICATE_CHARGE",
+                    "FAILED_TRANSFER",
+                    "ATM_NOT_DISPENSED",
+                    "UNAUTHORISED_CARD",
+                    "SCAM_TRANSFER",
+                    "FEE_DISPUTE",
+                    "SERVICE_QUALITY"
+                  ]
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array",
+              "maxItems": 2,
+              "minItems": 2
+            },
+            "type": "array",
+            "title": "Top3"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "rules",
+              "classifier",
+              "llm"
+            ],
+            "title": "Source"
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "EN",
+              "MS"
+            ],
+            "title": "Language"
+          },
+          "language_reason": {
+            "type": "string",
+            "title": "Language Reason"
+          },
+          "is_complaint": {
+            "type": "boolean",
+            "title": "Is Complaint"
+          },
+          "injection_suspected": {
+            "type": "boolean",
+            "title": "Injection Suspected"
+          },
+          "scam_cue": {
+            "type": "boolean",
+            "title": "Scam Cue"
+          }
+        },
+        "type": "object",
+        "required": [
+          "issues",
+          "top3",
+          "source",
+          "language",
+          "language_reason",
+          "is_complaint",
+          "injection_suspected",
+          "scam_cue"
+        ],
+        "title": "Understanding"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

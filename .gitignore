@@ -8,3 +8,6 @@ details.csv
 .playwright-cli/
 node_modules/
 shots/
+
+# runtime files: sqlite DBs, llm cache, classifier
+backend/var/

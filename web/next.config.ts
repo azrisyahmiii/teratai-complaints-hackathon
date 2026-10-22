@@ -4,6 +4,10 @@ const nextConfig: NextConfig = {
   /* config options here */
   cacheComponents: true,
   partialPrefetching: true,
+  async rewrites() {
+    const apiUrl = process.env.API_URL ?? "http://localhost:8000";
+    return [{ source: "/api/:path*", destination: `${apiUrl}/api/:path*` }];
+  },
   turbopack: {
     rules: {
       "*.css": {
