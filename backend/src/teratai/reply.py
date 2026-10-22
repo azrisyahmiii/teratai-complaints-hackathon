@@ -142,10 +142,6 @@ def build_facts(row: ComplaintRow, category: Category, m: MatchResult, d: Decisi
 PROMPT_VERSION = (
     "reply-v1"  # part of the llm cache key: bump it when SYSTEM_PROMPT or the fact-sheet layout changes
 )
-REPLY_MAX_TOKENS = (
-    800  # ~120 words is ~250 tokens; headroom for Malay and for adaptive thinking  # TODO(lead): config
-)
-MAX_WORDS = 120  # TODO(lead): move to config
 
 _LANG_MOD: dict[str, ModuleType] = {"EN": _en, "MS": _ms}
 _QUANTITY_LABELS = {  # FactSheet.amounts key -> label the model sees
@@ -217,7 +213,7 @@ numbers, web addresses, e-mail addresses or deadlines that are not in it. Copy I
 written there.
 2. Write the whole reply in the sheet's `language` (EN or MS). Start with the `greeting` line and end with the \
 `sign_off` lines, exactly as given.
-3. At most {MAX_WORDS} words in total. Plain text only: no markdown, bullet lists, headings, emojis, or quotation \
+3. At most {config.REPLY_MAX_WORDS} words in total. Plain text only: no markdown, bullet lists, headings, emojis, or quotation \
 marks around the reply. Short paragraphs.
 4. Say what the bank found and what happens next, following `situation`. Mention a refund only when `outcome` is \
 REFUND, and then state `refund_amount` and `working_days_to_resolve` working days. When `outcome` is not REFUND, never \
@@ -336,7 +332,7 @@ def _draft(provider: LLMProvider, messages: list[dict[str, Any]], stage: str, em
         messages=messages,
         model=settings.reply_model(),
         system=system_prompt(),
-        max_tokens=REPLY_MAX_TOKENS,
+        max_tokens=config.REPLY_MAX_TOKENS,
         effort=settings.reply_effort(),
         prompt_version=PROMPT_VERSION,
         emit=emit,
