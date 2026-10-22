@@ -10,6 +10,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from teratai.config import VAR_DIR
+
 BACKEND_DIR = Path(__file__).resolve().parents[3]
 REPO_ROOT = BACKEND_DIR.parent
 
@@ -53,7 +55,16 @@ def reply_effort() -> str:
 
 
 def cache_path() -> Path:
-    return Path(_get("LLM_CACHE_PATH", str(BACKEND_DIR / "var" / "llm_cache.sqlite")))
+    return Path(_get("LLM_CACHE_PATH", str(VAR_DIR / "llm_cache.sqlite")))
+
+
+def timeout_s() -> float:
+    """Per-request timeout. Short, so a stuck call falls back to a template quickly (§6)."""
+    return float(_get("LLM_TIMEOUT_S", "20"))
+
+
+def max_retries() -> int:
+    return int(_get("LLM_MAX_RETRIES", "1"))
 
 
 def api_key() -> str | None:

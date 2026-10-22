@@ -26,7 +26,7 @@ def _p(i: str, o: str, r: str, w: str) -> ModelPrice:
 
 PRICE_TABLE: dict[str, ModelPrice] = {
     "claude-haiku-5-5": _p("0.10", "0.50", "0.01", "0.125"),
-    "claude-sonnet-5-5": _p("2", "10", "0.10", "2.50"),
+    "claude-sonnet-5-5": _p("2", "10", "0.20", "2.50"),
 }
 
 # Haiku 5.5, prompts over LONG_PROMPT_TOKENS.

@@ -261,7 +261,13 @@ class BaseProvider:
             sys_parts.append(f"Respond only by calling the `{tool_name}` tool exactly once.")
         request = self._base_request(model, messages, _system_blocks(sys_parts, cache_last=True), max_tokens, None)
         request["tools"] = [{"name": tool_name, "description": tool_description, "input_schema": schema}]
-        request["tool_choice"] = {"type": "tool", "name": tool_name} if forced else {"type": "auto"}
+        if forced:
+            # A forced tool call cannot run with thinking on; Haiku 5.5 thinks by default (medium effort),
+            # and `disabled` is accepted there at effort high or below.
+            request["thinking"] = {"type": "disabled"}
+            request["tool_choice"] = {"type": "tool", "name": tool_name}
+        else:
+            request["tool_choice"] = {"type": "auto"}
         record, usage = self._complete(request, prompt_version)
         for block in record["content"]:
             if block.get("type") == "tool_use" and block.get("name") == tool_name:

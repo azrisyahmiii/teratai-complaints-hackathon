@@ -7,6 +7,7 @@ from typing import Any
 
 import anthropic
 
+from teratai.llm import settings
 from teratai.llm.base import BaseProvider
 from teratai.llm.cache import LLMCache
 
@@ -31,7 +32,9 @@ class AnthropicProvider(BaseProvider):
         self, cache: LLMCache, api_key: str | None = None, client: anthropic.Anthropic | None = None
     ) -> None:
         super().__init__(cache)
-        self.client = client or anthropic.Anthropic(api_key=api_key, timeout=60.0, max_retries=2)
+        self.client = client or anthropic.Anthropic(
+            api_key=api_key, timeout=settings.timeout_s(), max_retries=settings.max_retries()
+        )
 
     def _call_api(self, request: dict[str, Any], key: str) -> dict[str, Any]:
         start = time.perf_counter()
