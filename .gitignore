@@ -5,3 +5,6 @@ __pycache__/
 venv/
 details.csv
 .DS_Store
+.playwright-cli/
+node_modules/
+shots/
