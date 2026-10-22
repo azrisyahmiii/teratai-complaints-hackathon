@@ -194,7 +194,12 @@ def test_pick_with_no_amount_clue_is_still_checked() -> None:
     row = _row("transfer failed")
     window = dates.full_window(row.received_at)
     issue = Issue(category="FAILED_TRANSFER")
-    assert match._validate_investigator(SHALINI_TXN, row, issue, window, "")
+    # no clue and nothing in the text: the date alone is a guess, so the pick is refused (SPEC §2)
+    assert not match._validate_investigator(SHALINI_TXN, row, issue, window, "")
+    assert not match._validate_investigator(SHALINI_TXN, row, issue, window, "something went wrong with my transfer")
+    # evidence the regex missed but the text carries (the amount, the payee) lets the investigator decide
+    assert match._validate_investigator(SHALINI_TXN, row, issue, window, "my transfer of RM46.54 failed")
+    assert match._validate_investigator(SHALINI_TXN, row, issue, window, "my transfer to Shalini failed")
     # a different category's channel family, another customer's txn, a credit, a txn outside the window
     assert not match._validate_investigator(SHALINI_TXN, row, Issue(category="ATM_NOT_DISPENSED"), window, "")
     assert not match._validate_investigator(SHALINI_TXN, _row("x", customer="CUS-00001"), issue, window, "")

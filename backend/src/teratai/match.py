@@ -333,11 +333,22 @@ def _fee_fits(t: Txn, issue: Issue, window: DateWindow, text: str) -> bool:
     return issue.amount is None or tools.amount_matches(t.amount, issue.amount)
 
 
+def _has_evidence(t: Txn, issue: Issue, window: DateWindow, text: str) -> bool:
+    """A discriminating signal from the clues, or straight from the complaint text (the investigator reads text the
+    regex may have missed): the txn amount written in it (within the approximate tolerance) or its card digits."""
+    if config.DISCRIMINATING_SIGNALS & _score(t, issue, window, text).breakdown.keys():
+        return True
+    tol = max(t.amount * config.AMOUNT_APPROX_PCT, config.AMOUNT_APPROX_MIN_MYR)
+    if any(abs(a - t.amount) <= (tol if approx else config.AMOUNT_EXACT_TOL) for a, approx, *_ in extract.amounts(text)):
+        return True
+    return bool(t.card_last4) and t.card_last4 == extract.card_last4(text)
+
+
 def _validate_investigator(txn_id: str, row: ComplaintRow, issue: Issue, window: DateWindow, text: str) -> bool:
     """The investigator's pick must pass every hard filter and contradict no clue, or it is ignored (SPEC §4.4b).
 
     Ownership, debit, channel family; then the same filters the matcher applies (window + amount, or fee type +
-    month); then the clues that exist: the card digits and the named payee / merchant. Nothing is skipped.
+    month) and at least one discriminating signal; then the clues that exist: the card digits and the named payee / merchant. Nothing is skipped.
     """
     if not data.has_txn(txn_id):
         return False
@@ -350,6 +361,10 @@ def _validate_investigator(txn_id: str, row: ComplaintRow, issue: Issue, window:
         if not _fee_fits(t, issue, window, text):
             return False
     elif txn_id not in {s.txn_id for s in _survivors(row, issue, window)}:
+        return False
+    # The investigator may break a tie, never guess: its pick needs the same discriminating evidence the matcher
+    # requires for UNIQUE (amount, payee, card digits or fee type + month), not the date alone (SPEC §2).
+    if issue.category != "FEE_DISPUTE" and not _has_evidence(t, issue, window, text):
         return False
     if issue.card_last4 and issue.category in _CARD_CATEGORIES and t.card_last4 != issue.card_last4:
         return False
