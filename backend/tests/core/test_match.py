@@ -206,11 +206,12 @@ def test_find_transactions_tool_returns_strings() -> None:
         "find_transactions",
         {"customer_id": "CUS-02394", "start": "2026-07-01", "end": "2026-07-20", "channels": ["ATM Withdrawal"],
          "amount": "1500.00"},
+        "CUS-02394",
     )  # fmt: skip
     assert out["count"] >= 1
     assert all(isinstance(t["amount_myr"], str) for t in out["transactions"])
-    assert "error" in tools.call_tool("find_transactions", {"customer_id": "CUS-02394"})
-    assert {s["name"] for s in tools.tool_specs()} == set(tools.handlers())
+    assert "error" in tools.call_tool("find_transactions", {"customer_id": "CUS-02394"}, "CUS-02394")
+    assert {s["name"] for s in tools.tool_specs()} == set(tools.handlers("CUS-02394"))
 
 
 # --- full training run -----------------------------------------------------------------------------
