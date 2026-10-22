@@ -26,7 +26,7 @@ from teratai.llm import LLMError, Usage, get_provider, settings
 from teratai.models import Candidate, ComplaintRow, DateWindow, Emit, Issue, StageEvent, Understanding
 
 PROMPT_VERSION = "inv-v2"
-MAX_CALLS = 5  # TODO(lead): move to config
+MAX_CALLS = config.INVESTIGATOR_MAX_CALLS
 MAX_SHOWN_CANDIDATES = 10  # matcher candidates shown to the model, best score first
 _TXN_ID = re.compile(r"^TXN-\d{7}$")
 
@@ -68,7 +68,7 @@ class InvestigationResult:
 
 def enabled() -> bool:
     """`INVESTIGATOR=off` disables the tool loop (the matcher then reports NEEDS_INFO as before)."""
-    return os.environ.get("INVESTIGATOR", "on").strip().lower() != "off"  # TODO(lead): move to config
+    return os.environ.get("INVESTIGATOR", "on").strip().lower() != "off"  # read at call time so tests can switch it
 
 
 # --- prompt ----------------------------------------------------------------------------------------
