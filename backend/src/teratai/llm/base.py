@@ -34,6 +34,11 @@ class LLMError(RuntimeError):
     """The model answered but not usably (no tool output, refusal, ...)."""
 
 
+class LLMUnavailable(LLMError):
+    """The API timed out, refused the connection or answered 5xx, or the circuit breaker is open (llm/breaker.py).
+    Retrying cannot help; callers fall back to regex clues / NEEDS_INFO / a template and flag `degraded`."""
+
+
 class CacheMiss(LLMError):
     """Replay provider: the request is not in the disk cache. Callers fall back to templates and flag `degraded`."""
 

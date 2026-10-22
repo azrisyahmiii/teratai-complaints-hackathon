@@ -287,7 +287,7 @@ def test_lone_survivor_without_a_clue_is_not_unique() -> None:
     assert match.match_case(row, _u(clued), window, _noop).status == "UNIQUE"
 
 
-def test_date_range_alone_is_not_discriminating() -> None:
+def test_date_alone_is_not_discriminating() -> None:  # wave 4: an exact day alone no longer singles one out
     cust, received, txn_id = _customer_with_single_atm()
     row = ComplaintRow(customer_id=cust, received_at=received, channel="App chat", text="ATM problem last week")
     t = data.txn(txn_id)
@@ -296,7 +296,7 @@ def test_date_range_alone_is_not_discriminating() -> None:
     m = match.match_case(row, _u(Issue(category="ATM_NOT_DISPENSED")), window, _noop)
     assert m.status == "NONE"
     exact = DateWindow(start=d, end=d, exact_day=d, phrase="on the day")
-    assert match.match_case(row, _u(Issue(category="ATM_NOT_DISPENSED")), exact, _noop).status == "UNIQUE"
+    assert match.match_case(row, _u(Issue(category="ATM_NOT_DISPENSED")), exact, _noop).status == "NONE"
 
 
 def test_my_transfer_failed_never_refunds() -> None:

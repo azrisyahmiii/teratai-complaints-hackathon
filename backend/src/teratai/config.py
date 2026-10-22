@@ -57,10 +57,11 @@ SCORE_WEIGHTS: dict[str, int] = {
     "product_named": 3,  # fee on two accounts: the product the text names wins
 }
 
-# A UNIQUE match needs at least one of these in the winner's score breakdown: date-in-range and the channel
-# family alone fit many transactions, so on their own they never single one out.
+# A UNIQUE match needs at least one of these in the winner's score breakdown. A date, even an exact day, plus
+# the channel family only says "the one transfer / charge that day": it can be someone else's payee, so it never
+# singles a transaction out on its own (SPEC §2 never guess). A fee is singled out by its type and month.
 DISCRIMINATING_SIGNALS: frozenset[str] = frozenset(
-    {"amount_exact", "amount_approx", "counterparty", "date_exact_day", "card_last4", "fee_type_month"}
+    {"amount_exact", "amount_approx", "counterparty", "card_last4", "fee_type_month"}
 )
 
 # Channel families by category (SPEC §4.4). `Fee` rows are matched on description; SERVICE_QUALITY has none.

@@ -60,11 +60,18 @@ def cache_path() -> Path:
 
 def timeout_s() -> float:
     """Per-request timeout. Short, so a stuck call falls back to a template quickly (§6)."""
-    return float(_get("LLM_TIMEOUT_S", "20"))
+    return float(_get("LLM_TIMEOUT_S", "10"))
 
 
 def max_retries() -> int:
+    """SDK retries per call (timeouts and 5xx included). A dead API costs timeout x (1 + retries) once, then the
+    breaker opens."""
     return int(_get("LLM_MAX_RETRIES", "1"))
+
+
+def breaker_seconds() -> float:
+    """How long the circuit breaker stays open after a timeout / connection error / 5xx (0 = never open)."""
+    return float(_get("LLM_BREAKER_SECONDS", "60"))
 
 
 def api_key() -> str | None:
