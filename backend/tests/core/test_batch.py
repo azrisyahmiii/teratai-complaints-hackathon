@@ -69,12 +69,14 @@ def test_raising_row_does_not_kill_run(base: AgentDecision, tmp_path: Path) -> N
     assert list(res.errors) == ["CMP-00002"] and "boom" in res.errors["CMP-00002"]
     assert len(res.rows) == 4
     bad = res.rows[1]
+    fraud = bad["category"] in ("SCAM_TRANSFER", "UNAUTHORISED_CARD")  # SPEC §6 defaults depend on the category
     assert (bad["complaint_id"], bad["outcome"], bad["refund_amount_myr"], bad["matched_txn_id"]) == (
         "CMP-00002",
-        "INVESTIGATE",
+        "INVESTIGATE" if fraud else "DECLINE",
         "0.00",
         "",
     )
+    assert bad["route"] == ("FRAUD_TEAM" if fraud else "HUMAN_APPROVAL")
     assert res.rows[0]["outcome"] == "REFUND"
     # errors are not checkpointed, so a rerun retries only the failed row
     again: list[str] = []

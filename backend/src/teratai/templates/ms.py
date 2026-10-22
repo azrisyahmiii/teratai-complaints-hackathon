@@ -1,4 +1,4 @@
-"""Malay reply templates (SPEC §4.6), formal register: Tuan/Puan, pihak bank, Dukacita dimaklumkan, Sekian, terima kasih.
+"""Malay reply templates (SPEC §4.6), formal register: Tuan/Puan, pihak bank, Sekian, terima kasih ("Dukacita dimaklumkan" only for bad news).
 
 Same keys and placeholders as `en.py`. BA reviews the wording; regulatory contacts are limited to the verified ones
 in `check.py` (NSRC 997, FMOS, BNMLINK 1-300-88-5465).
@@ -62,14 +62,14 @@ TEXTS: dict[str, str] = {
     "Jumlah {refund} akan dikreditkan semula ke akaun anda " + REFUND_TIME + "." + CLOSE,
     "UNAUTHORISED_CARD.INVESTIGATE": OPEN
     + "Kami telah menerima laporan anda mengenai transaksi kad {txn} sebanyak {amount}{at} pada {date}. Pasukan "
-    "penipuan kami sedang menyiasat dan akan menghubungi anda dalam masa {sla_days} hari bekerja. Belum ada keputusan "
-    "mengenai pemulangan wang. Sila pastikan kad anda selamat dan maklumkan kepada kami dengan segera tentang "
+    "penipuan kami sedang menyiasat dan akan menghubungi anda dalam masa {sla_days} hari bekerja, kemudian akan memaklumkan perkembangan sekurang-kurangnya setiap "
+    "{update_days} hari bekerja. Belum ada keputusan mengenai pemulangan wang. Sila pastikan kad anda selamat dan maklumkan kepada kami dengan segera tentang "
     "sebarang transaksi lain yang anda tidak kenali." + CLOSE,
     "SCAM_TRANSFER.INVESTIGATE": OPEN
-    + "Dukacita dimaklumkan bahawa anda terkesan dengan kejadian ini. Pasukan penipuan kami telah mula menyiasat "
+    + "Kami memohon maaf atas kesulitan yang anda alami. Pasukan penipuan kami telah mula menyiasat "
     "pemindahan wang anda{to} sebanyak {amount} pada {date} (transaksi {txn}) dan akan cuba menuntut semula dana "
-    "tersebut, walaupun pemulihan tidak dijamin. {scam_help} Kami akan memaklumkan perkembangan dalam masa "
-    "{sla_days} hari bekerja." + CLOSE,
+    "tersebut, walaupun pemulihan tidak dijamin. {scam_help} Kami akan memaklumkan perkembangan sekurang-kurangnya "
+    "setiap {update_days} hari bekerja sehingga siasatan selesai." + CLOSE,
     "FEE_DISPUTE.REFUND": OPEN
     + "Kami telah menyemak transaksi yuran {txn} sebanyak {charged} pada {date}. Yuran yang sepatutnya dikenakan ialah "
     "{due}. Beza sebanyak {refund} akan dikreditkan semula ke akaun anda " + REFUND_TIME + "." + CLOSE,
@@ -80,7 +80,7 @@ TEXTS: dict[str, str] = {
     + "Kami telah menyemak transaksi yuran {txn} sebanyak {charged} pada {date}. Yuran tersebut adalah mengikut jadual "
     "yuran bagi akaun anda, jadi kami tidak dapat memulangkan wang tersebut. {redress}" + CLOSE,
     "SERVICE_QUALITY.INFO_ONLY": OPEN
-    + "Dukacita dimaklumkan bahawa anda tidak berpuas hati dengan pengalaman tersebut. Aduan anda telah direkodkan dan "
+    + "Kami memohon maaf atas pengalaman kurang menyenangkan yang anda alami. Aduan anda telah direkodkan dan "
     "dirujuk kepada pasukan berkenaan, yang akan menyemaknya dan memberi maklum balas dalam masa {sla_days} hari "
     "bekerja." + CLOSE,
     "NEEDS_INFO": OPEN

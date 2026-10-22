@@ -7,12 +7,13 @@
 - `--replies template|llm`: sets the env var `REPLY_MODE` before the run; `reply.write_reply` reads it to choose the
   deterministic template path (`template`) or the LLM path (`llm`, default).
 - Resume by ID: every finished decision is appended to `VAR_DIR/batch/<run>.jsonl` (`AgentDecision` as JSON).
-  A rerun skips IDs already in it; `--fresh` deletes the file first. Use `--fresh` when you change `--replies`
-  or the code, because a resumed row keeps the decision it was checkpointed with.
+  The first line is a stamp: reply mode + a fingerprint of the `teratai` source (and the classifier MODEL_VERSION).
+  A rerun skips IDs already in the file, but refuses (exit 2) when the stamp differs from this run's: a resumed row
+  keeps the decision it was made with, so mixing modes or code versions would be silent. `--fresh` deletes the file.
 - Errors: one row that raises is logged and counted, the run continues. Its output row carries the SPEC §6
-  safe defaults (INVESTIGATE, no refund, no transaction, FRAUD_TEAM, flagged in the error list), so the CSV
-  always has every ID, and a later rerun retries it (errors are never checkpointed). INVESTIGATE with 0.00 can
-  never be a critical error in the scorer.
+  NEEDS_INFO defaults by category (SCAM / UNAUTHORISED: INVESTIGATE + FRAUD_TEAM; else DECLINE + HUMAN_APPROVAL; no
+  refund, no transaction; INVESTIGATE + FRAUD_TEAM if the category cannot be told), so the CSV always has every ID,
+  and a later rerun retries it (errors are never checkpointed). Never a refund, so never a critical error.
 - `--persist`: calls `pipeline.store(row, decision)` for every row (idempotent by complaint_id once Platform lands).
 - `--dist`: prints category/outcome/route/priority/reply_language shares vs labels_train.csv, flags > 5 pp shifts.
 - Only `AgentDecision.to_csv_row()` feeds the CSV. Written with the `csv` module, UTF-8.
@@ -21,6 +22,7 @@
 import argparse
 import contextlib
 import csv
+import hashlib
 import json
 import os
 import sys
@@ -31,16 +33,30 @@ from collections import Counter
 from collections.abc import Callable, Iterable, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
+from decimal import Decimal
+from functools import cache
 from pathlib import Path
 
-from teratai import config, data, pipeline
-from teratai.models import CSV_COLUMNS, AgentDecision, ComplaintRow, Emit, StageEvent
+from teratai import classify, config, data, lang, pipeline, policy
+from teratai.models import (
+    CSV_COLUMNS,
+    AgentDecision,
+    Category,
+    ComplaintRow,
+    Emit,
+    Outcome,
+    Priority,
+    StageEvent,
+)
 
 DIST_FIELDS = ("category", "outcome", "route", "priority", "reply_language")
 
 Process = Callable[[ComplaintRow, str, Emit | None], AgentDecision]
 Store = Callable[[ComplaintRow, AgentDecision], int]
 Lookup = Callable[[str], ComplaintRow]
+
+# categories whose NEEDS_INFO default is INVESTIGATE (SPEC §6), the same set as policy's
+FRAUD_CATEGORIES: frozenset[str] = frozenset({"SCAM_TRANSFER", "UNAUTHORISED_CARD"})
 
 ERROR_REPLY = {
     "EN": "Thank you for contacting Teratai Bank. We need more details to review your complaint and will be in touch.",
@@ -91,12 +107,56 @@ def read_ids(spec: str) -> list[str]:
     return list(dict.fromkeys(i for i in ids if i))
 
 
+class CheckpointMismatch(RuntimeError):
+    """The run's checkpoint was made with a different reply mode or code version."""
+
+
+@cache
+def code_fingerprint() -> str:
+    """12 hex chars over every `teratai` source file plus the classifier MODEL_VERSION."""
+    h = hashlib.sha1(f"classify.MODEL_VERSION={classify.MODEL_VERSION}".encode())
+    pkg = Path(__file__).resolve().parent
+    for p in sorted(pkg.rglob("*.py")):
+        h.update(p.relative_to(pkg).as_posix().encode())
+        h.update(p.read_bytes().replace(b"\r\n", b"\n"))
+    return h.hexdigest()[:12]
+
+
 def checkpoint_path(run_id: str, directory: Path | None = None) -> Path:
     return (directory or config.VAR_DIR / "batch") / f"{run_id}.jsonl"
 
 
+def stamp_line(replies: str, code: str) -> str:
+    return json.dumps({"_stamp": {"replies": replies, "code": code}}) + "\n"
+
+
+def read_stamp(path: Path) -> tuple[str, str] | None:
+    """(reply mode, code fingerprint) from the checkpoint's first line, None if it has no stamp."""
+    with path.open(encoding="utf-8") as fh:
+        first = fh.readline()
+    try:
+        stamp = json.loads(first)["_stamp"]
+        return str(stamp["replies"]), str(stamp["code"])
+    except (ValueError, KeyError, TypeError):
+        return None
+
+
+def check_stamp(path: Path, replies: str, code: str) -> None:
+    """Raise CheckpointMismatch unless the existing checkpoint was made with this reply mode and code."""
+    if not path.is_file() or path.stat().st_size == 0:
+        return
+    found = read_stamp(path)
+    if found == (replies, code):
+        return
+    was = f"replies={found[0]}, code={found[1]}" if found else "no stamp (made by an older version)"
+    raise CheckpointMismatch(
+        f"checkpoint {path.name} was made with {was}; this run is replies={replies}, code={code}. "
+        "Rerun with --fresh to start over."
+    )
+
+
 def load_checkpoint(path: Path) -> dict[str, AgentDecision]:
-    """Decisions finished by an earlier run. A torn last line (killed mid-write) is ignored."""
+    """Decisions finished by an earlier run. The stamp line and a torn last line (killed mid-write) are ignored."""
     done: dict[str, AgentDecision] = {}
     if not path.is_file():
         return done
@@ -118,21 +178,43 @@ def write_csv(path: Path, rows: Iterable[dict[str, str]]) -> None:
         w.writerows(rows)
 
 
+def _noop(_event: StageEvent) -> None:
+    return None
+
+
 def error_row(complaint_id: str, lookup: Lookup = data.complaint) -> dict[str, str]:
-    """SPEC §6 safe NEEDS_INFO default for a row the pipeline could not process."""
-    lang = "EN"
-    with contextlib.suppress(Exception):  # unknown id or customer: the default language is enough
-        lang = data.customer(lookup(complaint_id).customer_id).preferred_language
+    """SPEC §6 NEEDS_INFO defaults for a row the pipeline could not process. Never a refund.
+
+    Each piece is recovered in its own try: language from the row, category from `classify.understand`, priority from
+    the policy's base priority (+65 bump). Whatever cannot be recovered keeps the safe default (INVESTIGATE, FRAUD_TEAM).
+    """
+    row: ComplaintRow | None = None
+    with contextlib.suppress(Exception):  # unknown id: the defaults below are enough
+        row = lookup(complaint_id)
+    language = "EN"
+    category: Category | None = None
+    priority: Priority = "P2"
+    if row is not None:
+        with contextlib.suppress(Exception):
+            language = lang.reply_language(row)[0]
+        with contextlib.suppress(Exception):
+            category = classify.understand(row, "batch", _noop).issues[0].category
+        if category is not None:
+            with contextlib.suppress(Exception):
+                priority = policy.priority_for(category, row)[0]
+    outcome: Outcome = (
+        "DECLINE" if category is not None and category not in FRAUD_CATEGORIES else "INVESTIGATE"
+    )
     return {
         "complaint_id": complaint_id,
-        "category": "SERVICE_QUALITY",
+        "category": category or "SERVICE_QUALITY",
         "matched_txn_id": "",
-        "outcome": "INVESTIGATE",
+        "outcome": outcome,
         "refund_amount_myr": "0.00",
-        "priority": "P2",
-        "reply_language": lang,
-        "route": "FRAUD_TEAM",
-        "reply_text": ERROR_REPLY.get(lang, ERROR_REPLY["EN"]),
+        "priority": priority,
+        "reply_language": language,
+        "route": policy.route_for(outcome, Decimal("0.00")),
+        "reply_text": ERROR_REPLY.get(language, ERROR_REPLY["EN"]),
     }
 
 
@@ -216,6 +298,7 @@ def run_batch(
     concurrency: int = config.BATCH_CONCURRENCY,
     fresh: bool = False,
     persist: bool = False,
+    replies: str | None = None,
     process: Process = pipeline.process_complaint,
     store: Store = pipeline.store,
     lookup: Lookup = data.complaint,
@@ -226,8 +309,13 @@ def run_batch(
     t_start = time.perf_counter()
     ck = checkpoint_path(run_id, checkpoint_dir)
     ck.parent.mkdir(parents=True, exist_ok=True)
+    mode = replies or os.environ.get("REPLY_MODE", "llm")
+    code = code_fingerprint()
     if fresh and ck.exists():
         ck.unlink()
+    check_stamp(ck, mode, code)
+    if not ck.exists() or ck.stat().st_size == 0:
+        ck.write_text(stamp_line(mode, code), encoding="utf-8")
     done = load_checkpoint(ck)
     res = BatchResult(run_id=run_id)
     res.decisions = {i: done[i] for i in ids if i in done}
@@ -338,7 +426,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not ids:
         print("no complaint ids", file=sys.stderr)
         return 2
-    res = run_batch(ids, args.run, concurrency=args.concurrency, fresh=args.fresh, persist=args.persist)
+    try:
+        res = run_batch(
+            ids,
+            args.run,
+            concurrency=args.concurrency,
+            fresh=args.fresh,
+            persist=args.persist,
+            replies=args.replies,
+        )
+    except CheckpointMismatch as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
     if args.out:
         write_csv(args.out, res.rows)
         print(f"wrote {len(res.rows)} rows to {args.out}")

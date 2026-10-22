@@ -76,3 +76,9 @@ CHANNEL_FAMILIES: dict[str, tuple[str, ...]] = {
 # --- batch (SPEC §12, §17) -----------------------------------------------------------------------
 BATCH_CONCURRENCY = _int("BATCH_CONCURRENCY", 8)
 DIST_TOLERANCE_PP = float(os.environ.get("DIST_TOLERANCE_PP", "5.0"))  # test-vs-train share shift that flags
+
+# --- replies (SPEC §4.6, §4.7) -------------------------------------------------------------------
+REPLY_MIN_WORDS = _int("REPLY_MIN_WORDS", 15)  # a shorter reply ("Ok.", "...") fails the self-check as empty
+SCAM_UPDATE_WORKING_DAYS = _int(
+    "SCAM_UPDATE_WORKING_DAYS", 10
+)  # the bank's own promise: update at least this often

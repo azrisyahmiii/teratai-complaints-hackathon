@@ -54,13 +54,14 @@ TEXTS: dict[str, str] = {
     "refund {refund} to your account " + REFUND_TIME + "." + CLOSE,
     "UNAUTHORISED_CARD.INVESTIGATE": OPEN
     + "We have received your report about card transaction {txn} of {amount}{at} on {date}. Our fraud team is "
-    "investigating and will contact you within {sla_days} working days. No decision on a refund has been made yet. "
-    "Please keep your card safe and tell us at once about any other transaction you do not recognise."
+    "investigating and will contact you within {sla_days} working days, then update you at least every "
+    "{update_days} working days. No decision on a refund has been made yet. Please keep your card safe and tell us at once about any other transaction you do not recognise."
     + CLOSE,
     "SCAM_TRANSFER.INVESTIGATE": OPEN
     + "We are very sorry to hear this. Our fraud team has started investigating your transfer{to} of {amount} on {date} "
     "(transaction {txn}) and will attempt to recall the funds, although recovery cannot be guaranteed. {scam_help} "
-    "We will update you within {sla_days} working days." + CLOSE,
+    "We will update you at least every {update_days} working days until the investigation is complete."
+    + CLOSE,
     "FEE_DISPUTE.REFUND": OPEN
     + "We reviewed fee transaction {txn} of {charged} on {date}. The fee due on your account was {due}. We will "
     "refund the difference of {refund} " + REFUND_TIME + "." + CLOSE,
