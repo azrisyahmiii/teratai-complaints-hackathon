@@ -17,7 +17,6 @@ share below tau and train time, and writes `VAR_DIR/classifier.joblib`.
 import contextlib
 import hashlib
 import importlib
-import os
 import re
 import sys
 import time
@@ -37,9 +36,6 @@ from sklearn.pipeline import FeatureUnion, Pipeline
 from teratai import config, data, extract, lang
 from teratai.models import Category, ComplaintRow, Emit, Mode, StageEvent, Understanding
 
-# TODO(lead): move these to config.py (not owned by C6).
-CLASSIFY_USE_OOF = os.environ.get("CLASSIFY_USE_OOF", "1") != "0"  # train IDs use OOF probabilities
-CLASSIFY_TAU = os.environ.get("CLASSIFY_TAU")  # optional fixed tau; default = chosen from OOF at train time
 TARGET_ACCEPTED_ACCURACY = 0.99  # accepted (conf >= tau) OOF items must be at least this accurate
 MAX_BELOW_TAU_SHARE = 0.10  # at most this share of items may fall below tau (goes to the LLM)
 SCAM_PRECEDENCE_CONF = 0.95  # step 4: scam cue beats FAILED/UNAUTH labels below this confidence
@@ -222,13 +218,13 @@ def _artifact() -> Artifact:
 
 
 def tau() -> float:
-    return float(CLASSIFY_TAU) if CLASSIFY_TAU else _artifact().tau
+    return float(config.CLASSIFY_TAU) if config.CLASSIFY_TAU else _artifact().tau
 
 
 def probabilities(row: ComplaintRow) -> tuple[NDF, bool]:
     """Class probabilities (in `_artifact().classes` order) and whether they are held-out OOF values."""
     art = _artifact()
-    if CLASSIFY_USE_OOF and row.complaint_id in art.oof:
+    if config.CLASSIFY_USE_OOF and row.complaint_id in art.oof:
         return np.array(art.oof[row.complaint_id]), True
     return art.pipeline.predict_proba([_text(row)])[0], False
 

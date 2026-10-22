@@ -30,6 +30,10 @@ DEBIT_FEE_WAIVER_AGE = _int("DEBIT_FEE_WAIVER_AGE", 60)  # age on the charge dat
 DUPLICATE_WINDOW_MINUTES = _int("DUPLICATE_WINDOW_MINUTES", 10)
 MATCH_WINDOW_DAYS = _int("MATCH_WINDOW_DAYS", 45)
 
+# --- classifier (SPEC §4.2) ----------------------------------------------------------------------
+CLASSIFY_USE_OOF = os.environ.get("CLASSIFY_USE_OOF", "1") != "0"  # train IDs use OOF probabilities
+CLASSIFY_TAU = os.environ.get("CLASSIFY_TAU")  # optional fixed tau; default = chosen from OOF at train time
+
 # --- matcher (SPEC §4.4) -------------------------------------------------------------------------
 MATCH_WINDOW_SLACK_DAYS = _int("MATCH_WINDOW_SLACK_DAYS", 1)  # extra day on the 45-day window
 DATE_SLACK_DAYS = _int("DATE_SLACK_DAYS", 1)  # exact day D is searched over [D - 1, D + 1]
