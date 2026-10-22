@@ -12,7 +12,7 @@ from collections.abc import Callable
 from datetime import date
 from decimal import Decimal
 
-from teratai import classify, config, data, extract, tools
+from teratai import classify, config, data, extract, investigate, tools
 from teratai.data import Txn
 from teratai.models import (
     Candidate,
@@ -75,14 +75,28 @@ _NAME_NOISE = frozenset(
 )
 _WORD = re.compile(r"[a-z0-9/]+")
 
-# The investigator (§4.4b) is C12's. Until then it declines, and the matcher reports NONE / AMBIGUOUS.
+# The investigator (§4.4b, `investigate.py`) proposes a txn id; `_run` re-validates it against the hard filters.
 Investigator = Callable[[ComplaintRow, Understanding, DateWindow, list[Candidate], Emit], str | None]
 
 
 def _investigate(
     row: ComplaintRow, u: Understanding, window: DateWindow, candidates: list[Candidate], emit: Emit
 ) -> str | None:
-    return None
+    """The investigator's proposed txn id that passes the hard filters, else None (NEEDS_INFO)."""
+    result = investigate.investigate(row, u, window, candidates, emit)
+    if result is None or result.txn_id is None:
+        return None
+    if not _validate_investigator(result.txn_id, row, u.issues[0], window):
+        emit(
+            StageEvent(
+                stage="investigate",
+                ok=False,
+                latency_ms=0,
+                payload={"kind": "rejected", "txn_id": result.txn_id, "reason": "failed the hard filters"},
+            )
+        )
+        return None
+    return result.txn_id
 
 
 # --- scoring helpers -------------------------------------------------------------------------------
