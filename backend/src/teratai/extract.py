@@ -21,7 +21,7 @@ from typing import Any, Literal, get_args
 from pydantic import BaseModel, ConfigDict, ValidationError, field_validator
 
 from teratai import dates
-from teratai.llm import CacheMiss, LLMError, MissingApiKey, get_provider, settings
+from teratai.llm import CacheMiss, LLMError, LLMUnavailable, MissingApiKey, get_provider, settings
 from teratai.models import Category, ComplaintRow, Emit, Issue, StageEvent
 
 FeeType = Literal["monthly_service", "debit_annual", "cc_annual"]
@@ -227,6 +227,35 @@ def fee_month(text: str, received_at: datetime) -> str | None:
         return f"{y:04d}-{mo:02d}"
     if _THIS_MONTH.search(text):
         return f"{received_at.year:04d}-{received_at.month:02d}"
+    return None
+
+
+# --- named payee / merchant (SPEC §2 "never guess") --------------------------------------------------------
+# "to Ahmad Fauzi", "at GoRide", "kepada Siti binti Ali", "di Shopee": a capitalised span after the preposition.
+# The matcher only uses it to REFUSE a transaction whose payee / merchant does not fit the name; it never
+# selects one from it. Regex spans stay conservative (capitalised words only), so a plain "to my account" or
+# "at the ATM" names nobody.
+_NAME_WORD = r"[A-Z][\w&'’./-]*"
+_NAME_PARTICLE = r"(?:binti|bin|bte|bt|a/l|a/p|s/o|d/o)(?![\w/])"
+_PARTY = re.compile(rf"\b(?i:to|at|kepada|di|ke)\s+(?P<n>{_NAME_WORD}(?:\s+(?:{_NAME_WORD}|{_NAME_PARTICLE}))*)")
+_NOT_A_PARTY = frozenset(
+    {
+        "i", "we", "you", "it", "my", "the", "this", "that", "these", "those", "our", "your", "their", "him", "her",
+        "them", "me", "us", "teratai", "bank", "atm", "app", "rm", "myr", "sir", "madam", "whom", "tuan", "puan",
+        "isnin", "selasa", "rabu", "khamis", "jumaat", "sabtu", "ahad",
+        "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
+    }
+)  # fmt: skip
+
+
+def counterparty_span(text: str) -> str | None:
+    """The first payee / merchant name the text points at ("to Ahmad Fauzi"), else None."""
+    for m in _PARTY.finditer(text):
+        words = m.group("n").rstrip(".,;:!?)").split()
+        first = re.sub(r"['’]s$", "", words[0].rstrip(".,;:!?)").lower())
+        if first in _NOT_A_PARTY or first in _MONTHS or re.match(r"(?i:rm|myr)\d", first):
+            continue
+        return " ".join(w.rstrip(".,;:!?)") for w in words)
     return None
 
 
@@ -461,7 +490,7 @@ def llm_issue(row: ComplaintRow, emit: Emit | None = None) -> LLMExtraction | No
                 stage="extract",
             )
             raw = _RawExtraction.model_validate(res.data)
-        except (CacheMiss, MissingApiKey) as exc:
+        except (CacheMiss, MissingApiKey, LLMUnavailable) as exc:
             _degraded(sink, f"{type(exc).__name__}: {exc}")  # a retry cannot help
             return None
         except (ValidationError, LLMError) as exc:

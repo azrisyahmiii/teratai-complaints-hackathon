@@ -7,8 +7,8 @@ from typing import Any
 
 import anthropic
 
-from teratai.llm import settings
-from teratai.llm.base import BaseProvider
+from teratai.llm import breaker, settings
+from teratai.llm.base import BaseProvider, LLMUnavailable
 from teratai.llm.cache import LLMCache
 
 
@@ -38,7 +38,15 @@ class AnthropicProvider(BaseProvider):
 
     def _call_api(self, request: dict[str, Any], key: str) -> dict[str, Any]:
         start = time.perf_counter()
-        response = self.client.messages.create(**request)
+        breaker.check()  # fail fast while the API is known to be down
+        try:
+            response = self.client.messages.create(**request)
+        except (anthropic.APIConnectionError, anthropic.APIStatusError) as exc:
+            if isinstance(exc, anthropic.APIStatusError) and exc.status_code < 500:
+                raise  # a bad request or auth error is our bug, not an outage
+            # timeout (APITimeoutError is a connection error), refused connection, 5xx (503, 504, 529 included)
+            breaker.trip(f"{type(exc).__name__}: {exc}")
+            raise LLMUnavailable(f"{type(exc).__name__}: {exc}") from exc
         latency_ms = int((time.perf_counter() - start) * 1000)
         usage = response.usage
         return {

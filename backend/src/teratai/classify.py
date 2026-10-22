@@ -67,7 +67,10 @@ INJECTION_CUES = re.compile(
 # Compliment-only text: praise with none of the complaint markers below.
 _PRAISE = re.compile(
     r"thank you for (?:the )?(?:great|excellent|good|wonderful)|great service|excellent service|well done|"
-    r"terima kasih atas|syabas|perkhidmatan (?:yang )?(?:cemerlang|baik|bagus)|keep it up",
+    r"\bthank(?:s| you)\b[^.!?]{0,60}\b(?:helpful|friendly|professional|kind|polite|patient|efficient|excellent|great)\b|"
+    r"\b(?:very|so|really)\s+(?:helpful|friendly|professional|polite|efficient)\b|"
+    r"terima kasih atas|terima kasih[^.!?]{0,60}\b(?:membantu|ramah|cemerlang|bagus)\b|syabas|"
+    r"perkhidmatan (?:yang )?(?:cemerlang|baik|bagus)|keep it up",
     re.IGNORECASE,
 )
 _COMPLAINT_MARKER = re.compile(
@@ -91,6 +94,11 @@ def tier0(row: ComplaintRow) -> Tier0:
         injection_suspected=INJECTION_CUES.search(text) is not None,
         is_complaint=_is_complaint(text),
     )
+
+
+def is_complaint_text(row: ComplaintRow) -> bool:
+    """Tier 0 verdict on one row (pure, no model): False for gibberish and compliment-only messages (SPEC §6)."""
+    return _is_complaint(f"{row.subject} {row.text}")
 
 
 def _is_complaint(text: str) -> bool:
@@ -318,6 +326,9 @@ def _merge_llm(
         update={
             "issues": [issue],
             "source": source,
+            # Not a complaint when the rules OR the LLM say so. Either verdict only changes the reply (a polite
+            # generic acknowledgement, and only when the outcome is INFO_ONLY): policy never reads this flag.
+            "is_complaint": base.is_complaint and llm.is_complaint,
             "injection_suspected": injection,
             "top3": _top3(probs, classes, first=category),
         }

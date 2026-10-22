@@ -86,7 +86,7 @@ def _investigate(
     result = investigate.investigate(row, u, window, candidates, emit)
     if result is None or result.txn_id is None:
         return None
-    if not _validate_investigator(result.txn_id, row, u.issues[0], window):
+    if not _validate_investigator(result.txn_id, row, u.issues[0], window, f"{row.subject} {row.text}"):
         emit(
             StageEvent(
                 stage="investigate",
@@ -305,8 +305,40 @@ def _related(txn_id: str, sibling: Txn | None) -> dict[str, str]:
     return rel
 
 
-def _validate_investigator(txn_id: str, row: ComplaintRow, issue: Issue, window: DateWindow) -> bool:
-    """The investigator's pick must pass every hard filter, or it is ignored (SPEC §4.4b)."""
+def _named_party(issue: Issue, text: str) -> str | None:
+    """The payee / merchant the complaint names: the extractor's verbatim span, else a regex span ("to Ahmad")."""
+    return issue.counterparty or extract.counterparty_span(text)
+
+
+def _party_mismatch(t: Txn, issue: Issue, text: str) -> bool:
+    """The complaint names a payee / merchant and this transaction's counterparty is not it. Only the named
+    span is compared (not the whole text), so one stray word cannot rescue a wrong transaction."""
+    if issue.category == "FEE_DISPUTE":
+        return False  # a fee has no payee: it is matched on fee type + month
+    party = _named_party(issue, text)
+    return bool(party) and not counterparty_hit(t.merchant, party, "")
+
+
+def _fee_fits(t: Txn, issue: Issue, window: DateWindow, text: str) -> bool:
+    """Same filters as `_fee_candidates`: fee type prefix, then the month (or the window), plus a stated amount."""
+    fee_type = _infer_fee_type(issue, text)
+    prefix = _FEE_NAMES.get(fee_type) if fee_type else None
+    if prefix and not t.description.startswith(prefix):
+        return False
+    if issue.fee_month:
+        if _fee_period(t) != issue.fee_month:
+            return False
+    elif not (window.start <= t.txn_time.date() <= window.end):
+        return False
+    return issue.amount is None or tools.amount_matches(t.amount, issue.amount)
+
+
+def _validate_investigator(txn_id: str, row: ComplaintRow, issue: Issue, window: DateWindow, text: str) -> bool:
+    """The investigator's pick must pass every hard filter and contradict no clue, or it is ignored (SPEC §4.4b).
+
+    Ownership, debit, channel family; then the same filters the matcher applies (window + amount, or fee type +
+    month); then the clues that exist: the card digits and the named payee / merchant. Nothing is skipped.
+    """
     if not data.has_txn(txn_id):
         return False
     t = data.txn(txn_id)
@@ -315,11 +347,13 @@ def _validate_investigator(txn_id: str, row: ComplaintRow, issue: Issue, window:
     if t.channel not in config.CHANNEL_FAMILIES[issue.category]:
         return False
     if issue.category == "FEE_DISPUTE":
-        return True
-    if not (window.start <= t.txn_time.date() <= window.end):
+        if not _fee_fits(t, issue, window, text):
+            return False
+    elif txn_id not in {s.txn_id for s in _survivors(row, issue, window)}:
         return False
-    amount, tol = _amount_filter(issue)
-    return amount is None or tools.amount_matches(t.amount, amount, tol=tol)
+    if issue.card_last4 and issue.category in _CARD_CATEGORIES and t.card_last4 != issue.card_last4:
+        return False
+    return not _party_mismatch(t, issue, text)
 
 
 def _run(row: ComplaintRow, u: Understanding, window: DateWindow, emit: Emit) -> tuple[MatchResult, str | None]:
@@ -355,12 +389,14 @@ def _run(row: ComplaintRow, u: Understanding, window: DateWindow, emit: Emit) ->
     cands = _rank(cands)
     status, txn_id = _decide(cands)
     reason: str | None = None
-    if status == "UNIQUE" and _low_category_confidence(u):
+    if status == "UNIQUE" and txn_id and _party_mismatch(data.txn(txn_id), issue, text):
+        status, txn_id, reason = "AMBIGUOUS", None, "counterparty_mismatch"  # the named payee is someone else
+    elif status == "UNIQUE" and _low_category_confidence(u):
         status, txn_id, reason = "AMBIGUOUS", None, "low_category_confidence"
 
     if status != "UNIQUE":
         picked = _investigate(row, u, window, cands, emit)
-        if picked and _validate_investigator(picked, row, issue, window):
+        if picked and _validate_investigator(picked, row, issue, window, text):
             if all(c.txn_id != picked for c in cands):
                 cands.append(Candidate(txn_id=picked, score=0, breakdown={"investigator": 0}))
             r = result("UNIQUE", picked, cands, _related(picked, siblings.get(picked)))

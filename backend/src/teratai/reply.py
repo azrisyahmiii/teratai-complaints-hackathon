@@ -21,7 +21,7 @@ from functools import lru_cache
 from types import ModuleType
 from typing import Any, Literal
 
-from teratai import config, data
+from teratai import classify, config, data
 from teratai.check import check_reply
 from teratai.lang import reply_language
 from teratai.llm import LLMProvider, get_provider, settings
@@ -107,10 +107,24 @@ _FILL: dict[str, Callable[..., None]] = {
 }
 
 
-def build_facts(row: ComplaintRow, category: Category, m: MatchResult, d: Decision) -> FactSheet:
+def _state(row: ComplaintRow, m: MatchResult, d: Decision, is_complaint: bool | None) -> str:
+    if m.status == "WRONG_CUSTOMER":
+        return "wrong_customer"
+    if d.needs_info:
+        return "needs_info"
+    if d.outcome == "INFO_ONLY" and not (classify.is_complaint_text(row) if is_complaint is None else is_complaint):
+        return "not_complaint"  # gibberish or a compliment: a polite acknowledgement, no apology (SPEC §6)
+    return "decided"
+
+
+def build_facts(
+    row: ComplaintRow, category: Category, m: MatchResult, d: Decision, is_complaint: bool | None = None
+) -> FactSheet:
+    """`is_complaint` is the pipeline's verdict (`Understanding.is_complaint`: rules and LLM). Left out, the Tier 0
+    rules decide, so a caller that does not pass it still gets the polite acknowledgement for gibberish."""
     language, _reason = reply_language(row)
     cust = data.customer(row.customer_id)
-    state = "wrong_customer" if m.status == "WRONG_CUSTOMER" else "needs_info" if d.needs_info else "decided"
+    state = _state(row, m, d, is_complaint)
     ids: Ids = {"state": state}
     amounts: Amounts = {}
     dates: Dates = {}
@@ -364,6 +378,7 @@ def _finish(
                 "check_ok": check.ok,
                 "issues": [i.model_dump() for i in check.issues],
                 "state": state_of(facts),
+                "not_complaint": state_of(facts) == "not_complaint",  # sampling flag (SPEC §6)
                 "drafts": len(drafts),
                 "degraded": False,
                 "check_flagged": False,
