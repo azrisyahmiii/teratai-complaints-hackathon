@@ -34,8 +34,9 @@ MATCH_WINDOW_DAYS = _int("MATCH_WINDOW_DAYS", 45)
 MATCH_WINDOW_SLACK_DAYS = _int("MATCH_WINDOW_SLACK_DAYS", 1)  # extra day on the 45-day window
 DATE_SLACK_DAYS = _int("DATE_SLACK_DAYS", 1)  # exact day D is searched over [D - 1, D + 1]
 AMOUNT_EXACT_TOL = _dec("AMOUNT_EXACT_TOL", "0.005")  # exact amount: |a - b| <= 0.005
-AMOUNT_APPROX_PCT = _dec("AMOUNT_APPROX_PCT", "0.05")  # approximate amount: within max(5%, RM20)
-AMOUNT_APPROX_MIN_MYR = _dec("AMOUNT_APPROX_MIN_MYR", "20.00")
+AMOUNT_APPROX_PCT = _dec("AMOUNT_APPROX_PCT", "0.05")  # approximate amount: within max(5%, RM25)
+# SPEC §4.4 says RM20; customers round to the nearest RM50 ("about RM250" for RM227.11), 12 train cases need 25.
+AMOUNT_APPROX_MIN_MYR = _dec("AMOUNT_APPROX_MIN_MYR", "25.00")
 UNIQUE_MARGIN = _int("UNIQUE_MARGIN", 2)  # top score must beat the runner-up by this much
 DUPLICATE_LATEST_GAP_MINUTES = _int("DUPLICATE_LATEST_GAP_MINUTES", 10)  # 3+ identical: predecessor gap
 
@@ -47,6 +48,7 @@ SCORE_WEIGHTS: dict[str, int] = {
     "date_in_range": 1,
     "card_last4": 2,
     "fee_type_month": 5,
+    "product_named": 3,  # fee on two accounts: the product the text names wins
 }
 
 # Channel families by category (SPEC §4.4). `Fee` rows are matched on description; SERVICE_QUALITY has none.

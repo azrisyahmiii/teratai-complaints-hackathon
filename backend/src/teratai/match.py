@@ -47,10 +47,7 @@ _PRODUCT_WORDS: dict[str, tuple[str, ...]] = {
     "Credit Card Classic": ("classic",),
     "Credit Card Platinum": ("platinum",),
 }
-_APPROX_ROUND_HALF_STEP_MYR = Decimal(
-    "25.00"
-)  # customers round to the nearest RM50; TODO(lead): move to config
-_PRODUCT_NAMED = config.SCORE_WEIGHTS.get("product_named", 3)  # TODO(lead): add "product_named" to config
+_PRODUCT_NAMED = config.SCORE_WEIGHTS["product_named"]
 
 # Categories where `card_last4` names the customer's own card (on transfers it is the payee's account).
 _CARD_CATEGORIES = frozenset({"DUPLICATE_CHARGE", "UNAUTHORISED_CARD", "ATM_NOT_DISPENSED"})
@@ -149,7 +146,7 @@ def _amount_filter(issue: Issue) -> tuple[Decimal | None, Decimal | None]:
     if issue.amount is None:
         return None, None
     if issue.amount_approx:
-        floor = max(config.AMOUNT_APPROX_MIN_MYR, _APPROX_ROUND_HALF_STEP_MYR)
+        floor = config.AMOUNT_APPROX_MIN_MYR
         return issue.amount, max(issue.amount * config.AMOUNT_APPROX_PCT, floor)
     return issue.amount, None
 
