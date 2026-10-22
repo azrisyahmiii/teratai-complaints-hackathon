@@ -388,21 +388,23 @@ submissions/<team>/predictions.csv
 
 ## 15. Team split and timeline
 
-| | **Dev A, "Core" (accuracy owner)** | **Dev B, "Platform" (live-round owner)** | **BA/Tester, "Quality + Demo"** |
+Task files and file ownership: [tasks/HOWTO.md](tasks/HOWTO.md), [tasks/contracts.md](tasks/contracts.md). Ownership is per file, never shared.
+
+| | **Dev A, "Core" (accuracy owner)** | **Dev B, "Platform" (live-round owner, integrator)** | **BA/Tester, "Quality + Demo"** |
 |---|---|---|---|
-| Owns | data, dates, classifier, extract, match, investigator, policy, batch, scoring loop | FastAPI, DB, intake (JSON + CSV row), pipeline orchestration, SSE, reply + self-check wiring, queues UI; then the bonus ops platform | eval sets, error analysis, MS/EN reply review, templates, regulatory fact check, DEMO.md, pitch |
+| Owns | data, dates, classifier, extract, match, investigator, policy, LLM layer, reply + self-check + templates (code), batch, scoring loop, safety-net and final submission. After Checkpoint 2, may take whole bonus-screen directories (e.g. `web/app/fraud/**`) built on B's components | Integrator: FastAPI (`api/`), DB, intake (JSON + CSV row), pipeline orchestration, SSE, `ops/` (SLA, routing), and `web/` as sole owner of its structure, layout, shared components and generated API types; all merges; then the bonus ops platform | `eval/**`, error analysis, scripted demo rows, seed data spec, MS/EN template wording + reply review, `regulatory_facts.md`, DEMO.md, pitch |
 
 **Day 1**
 - 09:00–10:00 Kick-off. BA opens GitHub issues for anything in §18 that is still unclear.
 - 10:00–10:30 Contracts together: `Case`/`AgentDecision`/`Extraction` pydantic models, DB schema, API list, CSV writer. Commit.
-- 10:30–13:00 A: data + dates + matcher + `policy_test.py` on gold txns. B: FastAPI skeleton, LLM layer (one real call through the provider with a tool call executed), SQLite, **both intake endpoints with the README `LIVE-07` row as the first test**, pipeline stub → SSE; Next.js scaffold. BA: run the baseline + scorer; build `adversarial.jsonl` (30 cases) and `live_kit.md` (10 `LIVE-xx` rows in the official format, received 30 Sep); collect 30 date phrases for tests; **verify 997 / FMOS / BNMLINK and write `eval/regulatory_facts.md` with sources**.
+- 10:30–13:00 A: data + dates + LLM layer (one real call through the provider with a tool call executed) + matcher + `policy_test.py` on gold txns. B: FastAPI skeleton, SQLite, **both intake endpoints with the README `LIVE-07` row as the first test**, pipeline stub → SSE; Next.js scaffold. BA: run the baseline + scorer; build `adversarial.jsonl` (30 cases) and `live_kit.md` (10 `LIVE-xx` rows in the official format, received 30 Sep); collect 30 date phrases for tests; **verify 997 / FMOS / BNMLINK and write `eval/regulatory_facts.md` with sources**.
 - 14:00–16:00 A: classifier (OOF CV) + full deterministic run on train → **first score**. B: queues + case page reading real cases. BA: `--details` error analysis → ranked bug list to A.
 - **16:00 Checkpoint 1**: classify + match on 20 train complaints (we show all 1,750 OOF).
-- 16:00–close: A: fix top error buckets; **write a safety-net test submission tonight (deterministic + template replies)**. B: reply LLM + decision-bound self-check + redraft/template fallback. BA: MS/EN templates (using only verified regulatory facts); review 20 replies.
+- 16:00–close: A: fix top error buckets; decision-bound self-check + templates; **write a safety-net test submission tonight (deterministic + template replies)**. B: intake UI tabs, SSE stage view, write-back + outbox. BA: MS/EN templates (using only verified regulatory facts); review 20 replies.
 
 **Day 2**
 - 09:00 Stand-up (5 min).
-- 09:15–12:00 A: LLM extract fallback + investigator; train score ≥ 90. B: **core human gate first**: approval + fraud queues, approve / edit with re-check, outbox, `agent_decision` export; then the 50-case Checkpoint 2 run. BA: paste the live kit through the UI and log failures; review 10 test replies.
+- 09:15–12:00 A: reply LLM + redraft/template fallback, LLM extract fallback + investigator; train score ≥ 90. B: **core human gate first**: approval + fraud queues, approve / edit with re-check, outbox, `agent_decision` export; then the 50-case Checkpoint 2 run. BA: paste the live kit through the UI and log failures; review 10 test replies.
 - **12:00 Checkpoint 2**: full workflow on 50 train (decision, reply, approval, write-back) + training score posted.
 - 12:00–13:30 A: **final 750 test run** (cached; Sonnet replies), score sanity checks (distribution vs train), export the CSV from the DB. B: **bonus ops platform**: roles + login, two-tier escalation, fraud workbench actions, audit timeline, agent-vs-human view; `DEMO_MODE=cached` recording; seed ~30 demo cases. BA: rehearse the demo ×2.
 - 13:30–14:30 **Feature freeze.** Fix criticals only. README with AI and tool disclosure.
