@@ -9,16 +9,13 @@ All dates are naive MYT, relative to the received date. Exact day -> [day-1, day
 """
 
 import calendar
-import os
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
+from teratai.config import MATCH_WINDOW_DAYS
 from teratai.models import DateWindow
-
-# TODO(C1): move to config.py (MATCH_WINDOW_DAYS) once C1 lands.
-MATCH_WINDOW_DAYS = int(os.environ.get("MATCH_WINDOW_DAYS", "45"))
 
 # Weekday index follows date.weekday(): Monday = 0.
 _WEEKDAYS: dict[str, int] = {
