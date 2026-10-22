@@ -176,7 +176,7 @@ def test_mixed_reply_passes_only_when_the_reply_language_dominates(f244: FactShe
 
 
 def test_urls_and_unverified_numbers(f244: FactSheet) -> None:
-    base = "Dear Ms Aisyah, we will refund RM550.00 to your account. "
+    base = "Dear Ms Aisyah, thank you for writing to us. We will refund RM550.00 to your account. "
     for extra in (
         "Visit https://evil.example.com/pay",
         "See www.teratai-help.com",

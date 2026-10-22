@@ -8,6 +8,7 @@ from datetime import date
 from decimal import Decimal
 from types import ModuleType
 
+from teratai import config
 from teratai.models import FactSheet
 from teratai.templates import en, ms
 
@@ -69,6 +70,7 @@ def context(facts: FactSheet) -> dict[str, str]:
         "who": who(facts),
         "refund": money(facts.refund_myr),
         "sla_days": str(facts.sla_days),
+        "update_days": str(config.SCAM_UPDATE_WORKING_DAYS),
         "redress": mod.REDRESS,
         "scam_help": mod.SCAM_HELP,
         "at": "",
