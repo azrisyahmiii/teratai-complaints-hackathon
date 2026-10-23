@@ -63,7 +63,7 @@ export function DecisionSummary({ detail }: { detail: CaseDetail }) {
         </Field>
         <Field label="Refund">
           <div className="text-2xl font-semibold tabular-nums">
-            <Money value={refund} className="text-left" />
+            <Money key={detail.case.complaint_id} value={refund} className="text-left" animate />
           </div>
           {calc && <div className="font-mono text-[12.5px] text-muted-foreground">{calc}</div>}
         </Field>
