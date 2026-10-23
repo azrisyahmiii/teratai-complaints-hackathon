@@ -22,6 +22,7 @@ from typing import Any
 import anthropic
 
 from teratai import config, data, tools
+from teratai.extract import mask_sensitive
 from teratai.llm import LLMError, Usage, get_provider, settings
 from teratai.models import Candidate, ComplaintRow, DateWindow, Emit, Issue, StageEvent, Understanding
 
@@ -78,8 +79,8 @@ def enabled() -> bool:
 
 
 def _fence(text: str) -> str:
-    """The customer's words cannot close the untrusted block."""
-    return text.replace("</complaint_untrusted", "<\\/complaint_untrusted")
+    """The customer's words cannot close the untrusted block, and card / IC numbers are masked."""
+    return mask_sensitive(text).replace("</complaint_untrusted", "<\\/complaint_untrusted")
 
 
 def _clues(issue: Issue) -> dict[str, Any]:
