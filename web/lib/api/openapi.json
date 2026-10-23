@@ -557,6 +557,706 @@
         }
       }
     },
+    "/api/ops/queue": {
+      "get": {
+        "summary": "Get Queue",
+        "operationId": "get_queue_api_ops_queue_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Queue Api Ops Queue Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ops/escalations": {
+      "get": {
+        "summary": "Escalations",
+        "operationId": "escalations_api_ops_escalations_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Escalations Api Ops Escalations Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ops/cases/{complaint_id}": {
+      "get": {
+        "summary": "Case View",
+        "operationId": "case_view_api_ops_cases__complaint_id__get",
+        "parameters": [
+          {
+            "name": "complaint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Complaint Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Case View Api Ops Cases  Complaint Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ops/cases/{complaint_id}/trail": {
+      "get": {
+        "summary": "Get Trail",
+        "operationId": "get_trail_api_ops_cases__complaint_id__trail_get",
+        "parameters": [
+          {
+            "name": "complaint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Complaint Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Trail Api Ops Cases  Complaint Id  Trail Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ops/cases/{complaint_id}/approve": {
+      "post": {
+        "summary": "Approve",
+        "operationId": "approve_api_ops_cases__complaint_id__approve_post",
+        "parameters": [
+          {
+            "name": "complaint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Complaint Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Approve Api Ops Cases  Complaint Id  Approve Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ops/cases/{complaint_id}/reject": {
+      "post": {
+        "summary": "Reject",
+        "operationId": "reject_api_ops_cases__complaint_id__reject_post",
+        "parameters": [
+          {
+            "name": "complaint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Complaint Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Reject Api Ops Cases  Complaint Id  Reject Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ops/cases/{complaint_id}/escalate": {
+      "post": {
+        "summary": "Escalate",
+        "operationId": "escalate_api_ops_cases__complaint_id__escalate_post",
+        "parameters": [
+          {
+            "name": "complaint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Complaint Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Escalate Api Ops Cases  Complaint Id  Escalate Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ops/cases/{complaint_id}/manager-approve": {
+      "post": {
+        "summary": "Manager Approve",
+        "operationId": "manager_approve_api_ops_cases__complaint_id__manager_approve_post",
+        "parameters": [
+          {
+            "name": "complaint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Complaint Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Manager Approve Api Ops Cases  Complaint Id  Manager Approve Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ops/cases/{complaint_id}/manager-reject": {
+      "post": {
+        "summary": "Manager Reject",
+        "operationId": "manager_reject_api_ops_cases__complaint_id__manager_reject_post",
+        "parameters": [
+          {
+            "name": "complaint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Complaint Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Manager Reject Api Ops Cases  Complaint Id  Manager Reject Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ops/cases/{complaint_id}/fraud-ack": {
+      "post": {
+        "summary": "Fraud Ack",
+        "operationId": "fraud_ack_api_ops_cases__complaint_id__fraud_ack_post",
+        "parameters": [
+          {
+            "name": "complaint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Complaint Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Fraud Ack Api Ops Cases  Complaint Id  Fraud Ack Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ops/cases/{complaint_id}/fraud-log": {
+      "post": {
+        "summary": "Fraud Log",
+        "operationId": "fraud_log_api_ops_cases__complaint_id__fraud_log_post",
+        "parameters": [
+          {
+            "name": "complaint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Complaint Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Fraud Log Api Ops Cases  Complaint Id  Fraud Log Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ops/cases/{complaint_id}/fraud-outcome": {
+      "post": {
+        "summary": "Fraud Outcome",
+        "operationId": "fraud_outcome_api_ops_cases__complaint_id__fraud_outcome_post",
+        "parameters": [
+          {
+            "name": "complaint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Complaint Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OutcomeIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Fraud Outcome Api Ops Cases  Complaint Id  Fraud Outcome Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/audit": {
+      "get": {
+        "summary": "Audit",
+        "operationId": "audit_api_audit_get",
+        "parameters": [
+          {
+            "name": "complaint_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Complaint Id"
+            }
+          },
+          {
+            "name": "actor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Actor"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 200,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Audit Api Audit Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/metrics": {
+      "get": {
+        "summary": "Get Metrics",
+        "operationId": "get_metrics_api_metrics_get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "live",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category"
+            }
+          },
+          {
+            "name": "channel",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Channel"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetricsOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/health": {
       "get": {
         "summary": "Health",
@@ -620,6 +1320,28 @@
           "action"
         ],
         "title": "ActionIn"
+      },
+      "ApproveIn": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": ""
+          },
+          "reply_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply Text"
+          }
+        },
+        "type": "object",
+        "title": "ApproveIn"
       },
       "AtmJournalView": {
         "properties": {
@@ -1445,6 +2167,815 @@
         ],
         "title": "ManagerFigures"
       },
+      "MetricBucket": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "amount_myr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount Myr"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "count"
+        ],
+        "title": "MetricBucket"
+      },
+      "MetricDuration": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "p50_minutes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P50 Minutes"
+          },
+          "p95_minutes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P95 Minutes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "count",
+          "p50_minutes",
+          "p95_minutes"
+        ],
+        "title": "MetricDuration"
+      },
+      "MetricFilters": {
+        "properties": {
+          "date_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date From"
+          },
+          "date_to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date To"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "channel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channel"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date_from",
+          "date_to",
+          "category",
+          "channel"
+        ],
+        "title": "MetricFilters"
+      },
+      "MetricFraud": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "open": {
+            "type": "integer",
+            "title": "Open"
+          },
+          "p1_open": {
+            "type": "integer",
+            "title": "P1 Open"
+          },
+          "ack_overdue": {
+            "type": "integer",
+            "title": "Ack Overdue"
+          },
+          "amount_disputed_myr": {
+            "type": "string",
+            "title": "Amount Disputed Myr"
+          },
+          "by_category": {
+            "items": {
+              "$ref": "#/components/schemas/MetricBucket"
+            },
+            "type": "array",
+            "title": "By Category"
+          },
+          "acknowledged": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acknowledged"
+          },
+          "recall_attempts": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recall Attempts"
+          },
+          "outcomes": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/MetricBucket"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcomes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "open",
+          "p1_open",
+          "ack_overdue",
+          "amount_disputed_myr",
+          "by_category",
+          "acknowledged",
+          "recall_attempts",
+          "outcomes"
+        ],
+        "title": "MetricFraud"
+      },
+      "MetricGuardrails": {
+        "properties": {
+          "self_check_flagged": {
+            "$ref": "#/components/schemas/MetricRate"
+          },
+          "reply_source": {
+            "items": {
+              "$ref": "#/components/schemas/MetricBucket"
+            },
+            "type": "array",
+            "title": "Reply Source"
+          },
+          "overrides": {
+            "$ref": "#/components/schemas/MetricRate"
+          },
+          "rejections": {
+            "$ref": "#/components/schemas/MetricRate"
+          },
+          "escalations": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetricRate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "injection_suspected": {
+            "type": "integer",
+            "title": "Injection Suspected"
+          },
+          "degraded": {
+            "type": "integer",
+            "title": "Degraded"
+          },
+          "needs_info": {
+            "type": "integer",
+            "title": "Needs Info"
+          },
+          "vulnerable": {
+            "type": "integer",
+            "title": "Vulnerable"
+          }
+        },
+        "type": "object",
+        "required": [
+          "self_check_flagged",
+          "reply_source",
+          "overrides",
+          "rejections",
+          "escalations",
+          "injection_suspected",
+          "degraded",
+          "needs_info",
+          "vulnerable"
+        ],
+        "title": "MetricGuardrails"
+      },
+      "MetricMoney": {
+        "properties": {
+          "refunds_paid_myr": {
+            "type": "string",
+            "title": "Refunds Paid Myr"
+          },
+          "refunds_paid_count": {
+            "type": "integer",
+            "title": "Refunds Paid Count"
+          },
+          "avg_refund_myr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Refund Myr"
+          },
+          "awaiting_approval_myr": {
+            "type": "string",
+            "title": "Awaiting Approval Myr"
+          },
+          "awaiting_approval_count": {
+            "type": "integer",
+            "title": "Awaiting Approval Count"
+          },
+          "refunds_by_category": {
+            "items": {
+              "$ref": "#/components/schemas/MetricBucket"
+            },
+            "type": "array",
+            "title": "Refunds By Category"
+          }
+        },
+        "type": "object",
+        "required": [
+          "refunds_paid_myr",
+          "refunds_paid_count",
+          "avg_refund_myr",
+          "awaiting_approval_myr",
+          "awaiting_approval_count",
+          "refunds_by_category"
+        ],
+        "title": "MetricMoney"
+      },
+      "MetricOperations": {
+        "properties": {
+          "backlog": {
+            "items": {
+              "$ref": "#/components/schemas/MetricBucket"
+            },
+            "type": "array",
+            "title": "Backlog"
+          },
+          "ack_overdue": {
+            "type": "integer",
+            "title": "Ack Overdue"
+          },
+          "ack_due_2h": {
+            "type": "integer",
+            "title": "Ack Due 2H"
+          },
+          "turnaround": {
+            "$ref": "#/components/schemas/MetricDuration"
+          },
+          "human_actions": {
+            "type": "integer",
+            "title": "Human Actions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "backlog",
+          "ack_overdue",
+          "ack_due_2h",
+          "turnaround",
+          "human_actions"
+        ],
+        "title": "MetricOperations"
+      },
+      "MetricOptions": {
+        "properties": {
+          "categories": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Categories"
+          },
+          "channels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Channels"
+          },
+          "date_min": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Min"
+          },
+          "date_max": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Max"
+          }
+        },
+        "type": "object",
+        "required": [
+          "categories",
+          "channels",
+          "date_min",
+          "date_max"
+        ],
+        "title": "MetricOptions"
+      },
+      "MetricOutcomes": {
+        "properties": {
+          "by_outcome": {
+            "items": {
+              "$ref": "#/components/schemas/MetricBucket"
+            },
+            "type": "array",
+            "title": "By Outcome"
+          },
+          "by_route": {
+            "items": {
+              "$ref": "#/components/schemas/MetricBucket"
+            },
+            "type": "array",
+            "title": "By Route"
+          },
+          "auto_resolve_rate": {
+            "$ref": "#/components/schemas/MetricRate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "by_outcome",
+          "by_route",
+          "auto_resolve_rate"
+        ],
+        "title": "MetricOutcomes"
+      },
+      "MetricPerformance": {
+        "properties": {
+          "cases_measured": {
+            "type": "integer",
+            "title": "Cases Measured"
+          },
+          "latency_p50_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency P50 Ms"
+          },
+          "latency_p95_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency P95 Ms"
+          },
+          "cost_total_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Total Usd"
+          },
+          "cost_per_complaint_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Per Complaint Usd"
+          },
+          "llm_calls": {
+            "type": "integer",
+            "title": "Llm Calls"
+          },
+          "stages": {
+            "items": {
+              "$ref": "#/components/schemas/MetricStage"
+            },
+            "type": "array",
+            "title": "Stages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cases_measured",
+          "latency_p50_ms",
+          "latency_p95_ms",
+          "cost_total_usd",
+          "cost_per_complaint_usd",
+          "llm_calls",
+          "stages"
+        ],
+        "title": "MetricPerformance"
+      },
+      "MetricRate": {
+        "properties": {
+          "numerator": {
+            "type": "integer",
+            "title": "Numerator"
+          },
+          "denominator": {
+            "type": "integer",
+            "title": "Denominator"
+          },
+          "pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pct"
+          }
+        },
+        "type": "object",
+        "required": [
+          "numerator",
+          "denominator",
+          "pct"
+        ],
+        "title": "MetricRate"
+      },
+      "MetricStage": {
+        "properties": {
+          "stage": {
+            "type": "string",
+            "title": "Stage"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "p50_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P50 Ms"
+          },
+          "p95_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P95 Ms"
+          },
+          "cost_usd": {
+            "type": "string",
+            "title": "Cost Usd"
+          },
+          "tokens_in": {
+            "type": "integer",
+            "title": "Tokens In"
+          },
+          "tokens_out": {
+            "type": "integer",
+            "title": "Tokens Out"
+          }
+        },
+        "type": "object",
+        "required": [
+          "stage",
+          "count",
+          "p50_ms",
+          "p95_ms",
+          "cost_usd",
+          "tokens_in",
+          "tokens_out"
+        ],
+        "title": "MetricStage"
+      },
+      "MetricTeam": {
+        "properties": {
+          "team": {
+            "type": "string",
+            "enum": [
+              "approval",
+              "fraud",
+              "auto"
+            ],
+            "title": "Team"
+          },
+          "cases": {
+            "type": "integer",
+            "title": "Cases"
+          },
+          "open": {
+            "type": "integer",
+            "title": "Open"
+          },
+          "p1_open": {
+            "type": "integer",
+            "title": "P1 Open"
+          },
+          "ack_overdue": {
+            "type": "integer",
+            "title": "Ack Overdue"
+          },
+          "refund_total_myr": {
+            "type": "string",
+            "title": "Refund Total Myr"
+          },
+          "flagged": {
+            "type": "integer",
+            "title": "Flagged"
+          }
+        },
+        "type": "object",
+        "required": [
+          "team",
+          "cases",
+          "open",
+          "p1_open",
+          "ack_overdue",
+          "refund_total_myr",
+          "flagged"
+        ],
+        "title": "MetricTeam"
+      },
+      "MetricVolume": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "processing": {
+            "type": "integer",
+            "title": "Processing"
+          },
+          "errors": {
+            "type": "integer",
+            "title": "Errors"
+          },
+          "by_day": {
+            "items": {
+              "$ref": "#/components/schemas/MetricBucket"
+            },
+            "type": "array",
+            "title": "By Day"
+          },
+          "by_channel": {
+            "items": {
+              "$ref": "#/components/schemas/MetricBucket"
+            },
+            "type": "array",
+            "title": "By Channel"
+          },
+          "by_category": {
+            "items": {
+              "$ref": "#/components/schemas/MetricBucket"
+            },
+            "type": "array",
+            "title": "By Category"
+          },
+          "by_priority": {
+            "items": {
+              "$ref": "#/components/schemas/MetricBucket"
+            },
+            "type": "array",
+            "title": "By Priority"
+          },
+          "by_language": {
+            "items": {
+              "$ref": "#/components/schemas/MetricBucket"
+            },
+            "type": "array",
+            "title": "By Language"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "processing",
+          "errors",
+          "by_day",
+          "by_channel",
+          "by_category",
+          "by_priority",
+          "by_language"
+        ],
+        "title": "MetricVolume"
+      },
+      "MetricsOut": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "manager",
+              "officer",
+              "fraud"
+            ],
+            "title": "Role"
+          },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "sim_now": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Sim Now"
+          },
+          "filters": {
+            "$ref": "#/components/schemas/MetricFilters"
+          },
+          "options": {
+            "$ref": "#/components/schemas/MetricOptions"
+          },
+          "volume": {
+            "$ref": "#/components/schemas/MetricVolume"
+          },
+          "outcomes": {
+            "$ref": "#/components/schemas/MetricOutcomes"
+          },
+          "money": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetricMoney"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "operations": {
+            "$ref": "#/components/schemas/MetricOperations"
+          },
+          "guardrails": {
+            "$ref": "#/components/schemas/MetricGuardrails"
+          },
+          "fraud": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetricFraud"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "performance": {
+            "$ref": "#/components/schemas/MetricPerformance"
+          },
+          "teams": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/MetricTeam"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Teams"
+          },
+          "unavailable": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Unavailable"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role",
+          "run_id",
+          "sim_now",
+          "filters",
+          "options",
+          "volume",
+          "outcomes",
+          "money",
+          "operations",
+          "guardrails",
+          "fraud",
+          "performance",
+          "teams",
+          "unavailable"
+        ],
+        "title": "MetricsOut"
+      },
+      "NoteIn": {
+        "properties": {
+          "note": {
+            "type": "string",
+            "title": "Note",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "NoteIn"
+      },
       "OfficerFigures": {
         "properties": {
           "waiting": {
@@ -1545,6 +3076,41 @@
           "authorised_by"
         ],
         "title": "OutboxItem"
+      },
+      "OutcomeIn": {
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "confirmed_fraud",
+              "not_fraud",
+              "recall_succeeded",
+              "recall_failed"
+            ],
+            "title": "Outcome"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "outcome"
+        ],
+        "title": "OutcomeIn"
+      },
+      "ReasonIn": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "ReasonIn"
       },
       "StaffActionIn": {
         "properties": {
