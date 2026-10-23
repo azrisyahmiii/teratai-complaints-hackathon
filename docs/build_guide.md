@@ -25,7 +25,7 @@ Steps 2, 3 and 5 are deterministic: you can test them against `labels_train.csv`
 
 ## The API
 
-The live round reaches your agent through the API in [`api.md`](api.md). The simplest shape: accept the complaint, decide in the background, serve the case, and let a human act on cases waiting for approval. This FastAPI version is a working starting point; plug in your agent as `handle_complaint` and your reply check as `self_check` (see `starter/check_reply.py`). Point your own UI's Approve and Reject buttons at `POST /cases/{id}/actions` too:
+The live round reaches your agent through the API in [`api.md`](api.md). The simplest shape: accept the complaint, decide in the background, serve the case, and let a human act on cases waiting for approval. This FastAPI version is a working starting point; plug in your agent as `handle_complaint` and your reply check as `self_check(complaint, text)` (for example `starter/check_reply.py`'s `check_reply(db, complaint, text)`, which takes the complaint itself, so it also works for live-round complaints that aren't in `complaints.csv`). Point your own UI's Approve and Reject buttons at `POST /cases/{id}/actions` too:
 
 ```python
 # app.py, run with: uvicorn app:app --host 0.0.0.0 --port 8000
@@ -38,6 +38,7 @@ from pydantic import BaseModel
 
 app = FastAPI()
 CASES: dict[str, dict] = {}            # use a database in your real build
+COMPLAINTS: dict[str, dict] = {}       # the complaint as received: the self-check needs its customer_id and received_at
 POOL = ThreadPoolExecutor(max_workers=8)
 STATE = {"AUTO_RESOLVE": ("auto_resolved", True), "HUMAN_APPROVAL": ("awaiting_approval", False),
          "FRAUD_TEAM": ("with_fraud_team", False)}
@@ -77,6 +78,7 @@ def new_complaint(c: Complaint):
     if not c.text.strip():
         raise HTTPException(422, "text is empty")
     CASES[c.complaint_id] = {"complaint_id": c.complaint_id, "status": "processing"}
+    COMPLAINTS[c.complaint_id] = c.model_dump()
     POOL.submit(work, c)
     return {"complaint_id": c.complaint_id, "status": "processing"}
 
@@ -99,7 +101,7 @@ def act(complaint_id: str, a: Action):
         raise HTTPException(422, "actor is required")
     reply = case["reply_text"]
     if a.action == "edit_approve":
-        if not a.reply_text or self_check(complaint_id, a.reply_text):   # your self-check: returns the problems found
+        if not a.reply_text or self_check(COMPLAINTS[complaint_id], a.reply_text):   # your self-check: returns the problems found
             raise HTTPException(422, "edited reply is missing or fails the self-check")
         reply = a.reply_text
     approved = a.action != "reject"

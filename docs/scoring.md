@@ -52,12 +52,15 @@ python scoring/score.py submissions/<team>/predictions.csv data/labels_train.csv
 
 ## Final ranking
 
-| Weight | Criterion |
+Out of 150 points:
+
+| Points | Criterion |
 |---|---|
-| 30% | Leaderboard score on the test set |
-| 25% | Live round: **hidden test (15)**, 20 unseen complaints sent to your API and scored automatically (score × 0.15); **human gate (10)**, judges watch 3 complaints end to end (routing, approvals that hold, fraud queue, self-check) |
-| 25% | Business value and demo: reply quality (tone, correct language, no invented facts), clarity, would a bank use it |
-| 20% | Engineering: architecture, observability (show why it decided), cost and speed per complaint |
+| 30 | Leaderboard score on the test set |
+| 25 | Live round: **hidden test (15)**, 20 unseen complaints sent to your API and scored automatically (score × 0.15); **human gate (10)**, judges watch 3 complaints end to end (routing, approvals that hold, fraud queue, self-check) |
+| 40 | Business value and demo: reply quality (tone, correct language, no invented facts), clarity, would a bank use it, and how clearly the team presents and demos the solution |
+| 30 | Engineering: architecture, general programming principles (clean, maintainable code), observability (show why it decided), how access and roles (RBAC) are handled if you built the ops platform, cost and speed per complaint |
+| 25 | Business ops platform (optional, [`bonus_platform.md`](bonus_platform.md)): role-scoped queues, two-tier approval, an audit trail and insights (dashboard or chat). Scored on its own; doesn't change your leaderboard score |
 
 ### The live round
 

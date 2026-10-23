@@ -96,14 +96,15 @@ A decision about the wrong transaction earns nothing, so finding the right trans
 
 **Critical errors** are penalised on top: paying a refund the bank doesn't owe, and failing to send a fraud case to the fraud team. Each 1% of critical errors costs 2% of your score. Run the same scorer on the training labels at any time (see *Getting started*).
 
-**Final ranking:**
+**Final ranking (150 points):**
 
-| Weight | Criterion | How it is judged |
+| Points | Criterion | How it is judged |
 |---|---|---|
-| 30% | Accuracy | Leaderboard score on the test set |
-| 25% | Live round | **Hidden test (15):** our script sends 20 unseen, messily written complaints to your API and scores the answers automatically. **Human gate (10):** judges watch 3 more complaints end to end and check that approvals hold and fraud cases reach the fraud queue |
-| 25% | Business value and demo | Reply quality (tone, correct language, no invented facts; judges read 10 of your replies), clarity, and whether a bank would use it |
-| 20% | Engineering | Architecture, observability (can you show why it decided what it did?), cost and speed per complaint |
+| 30 | Accuracy | Leaderboard score on the test set |
+| 25 | Live round | **Hidden test (15):** our script sends 20 unseen, messily written complaints to your API and scores the answers automatically. **Human gate (10):** judges watch 3 more complaints end to end and check that approvals hold and fraud cases reach the fraud queue |
+| 40 | Business value and demo | Reply quality (tone, correct language, no invented facts; judges read 10 of your replies), clarity, whether a bank would use it, and how clearly the team presents and demos the solution |
+| 30 | Engineering | Architecture, general programming principles (clean, maintainable code), observability (can you show why it decided what it did?), how access and roles (RBAC) are handled if you built the ops platform, cost and speed per complaint |
+| 25 | Business ops platform | The optional back-office platform ([`docs/bonus_platform.md`](docs/bonus_platform.md)): role-scoped queues, two-tier approval, an audit trail and insights (dashboard or chat). Skip it and you forgo these 25 points; it doesn't affect your leaderboard score |
 
 ### The live round
 
@@ -172,7 +173,7 @@ More in [`docs/build_guide.md`](docs/build_guide.md): a reference workflow, wher
 
 ## Bonus: the ops platform
 
-An optional, separately judged award ("Best Ops Platform") for teams that turn the case record into a real back-office system: complaints officers and fraud analysts sign in to interfaces fitted to their job and see only their cases, a manager handles second-tier approval across both queues, and every action is written back and audited. It does not affect the main ranking or the leaderboard, and you can keep building it until 16:30 on Day 2. See [`docs/bonus_platform.md`](docs/bonus_platform.md).
+An optional, separately scored criterion in the final ranking ("Best Ops Platform", 25 points) for teams that turn the case record into a real back-office system: complaints officers and fraud analysts sign in to interfaces fitted to their job and see only their cases, a manager handles second-tier approval across both queues, every action is written back and audited, and staff can see the numbers through a dashboard or an AI chat over the case data. It is worth 25 of the 150 points and is scored on its own; it does not change your leaderboard/accuracy score. You can keep building it until 16:30 on Day 2. See [`docs/bonus_platform.md`](docs/bonus_platform.md).
 
 ## Submitting
 
@@ -196,13 +197,12 @@ If this repo changes before the event (clarifications only, never the data), syn
 
 ## FAQ
 
-**How will our agent be evaluated?** In four parts (details under *Scoring and judging*):
-1. **Accuracy (30%):** we score your `predictions.csv` for the 750 test complaints automatically.
-2. **Live round (25%):** right after the 15:00 freeze, our script sends 20 unseen, messily written complaints to your API and scores them (15); in your demo, judges watch 3 more end to end to check the approval and fraud handling (10).
-3. **Replies and demo (25%):** judges read your replies to the same 10 test complaints as every other team, and score the demo.
-4. **Engineering (20%):** you walk the judges through how it's built.
-
-Separately, there is an optional **Best Ops Platform** award for teams that build a full staff app: role-based queues, two-tier approval and an audit trail ([`docs/bonus_platform.md`](docs/bonus_platform.md)). It is judged on its own and doesn't change the main ranking.
+**How will our agent be evaluated?** Out of 150 points, in five parts (details under *Scoring and judging*):
+1. **Accuracy (30):** we score your `predictions.csv` for the 750 test complaints automatically.
+2. **Live round (25):** right after the 15:00 freeze, our script sends 20 unseen, messily written complaints to your API and scores them (15); in your demo, judges watch 3 more end to end to check the approval and fraud handling (10).
+3. **Replies and demo (40):** judges read your replies to the same 10 test complaints as every other team, and score your demo and how clearly you present the solution.
+4. **Engineering (30):** you walk the judges through how it's built — architecture, clean code and general programming principles, observability, and how you handle roles and access (RBAC) if you built the ops platform.
+5. **Business ops platform (25):** the optional back-office staff app — role-based queues, two-tier approval, an audit trail and an insights dashboard or chat over the case data ([`docs/bonus_platform.md`](docs/bonus_platform.md)). Optional: skip it and compete for the other 125 points. It is scored on its own and doesn't change your leaderboard/accuracy score.
 
 **Do we need to build an API?** Yes, a small one with a fixed contract: `POST /complaints`, `GET /cases/{complaint_id}` and `GET /health` ([`docs/api.md`](docs/api.md)). It's about 30 lines with FastAPI ([`docs/build_guide.md`](docs/build_guide.md#the-api)). It's how the live round sends you complaints, so every team is tested the same way. Check yours with `python scoring/api_check.py`.
 
@@ -215,9 +215,9 @@ Separately, there is an optional **Best Ops Platform** award for teams that buil
 - a case: the complaint, the matched transaction, the evidence, the decision, the reply and the self-check result;
 - the approval step.
 
-A simple web page, a Streamlit or Gradio app, a CLI or a notebook all work for the main ranking. Judges score clarity and whether a bank could use it, not visual polish. A fuller staff app is what the optional Best Ops Platform award is for.
+A simple web page, a Streamlit or Gradio app, a CLI or a notebook all work for the 125 points outside the ops platform. Judges score clarity and whether a bank could use it, not visual polish. A fuller staff app is what the optional 25-point ops-platform criterion rewards.
 
-**Do we need user accounts or roles (RBAC) for managers?** Not for the main ranking. There, "human in charge" means a case that needs approval waits until someone approves it in your system, and an approve or reject action that records the approver's name is enough. Roles (complaints officer, fraud analyst, manager), seeded users and second-tier approval by the manager belong to the optional **Best Ops Platform** award ([`docs/bonus_platform.md`](docs/bonus_platform.md)). Even there, seeded users with a `role` column are enough: don't build real authentication. Get the core agent working first.
+**Do we need user accounts or roles (RBAC) for managers?** Not for the 125 points outside the ops platform. There, "human in charge" just means a case that needs approval waits until someone approves it in your system, and an approve or reject action that records the approver's name is enough. Roles (complaints officer, fraud analyst, manager), seeded users and second-tier approval by the manager are part of the 25-point ops-platform criterion ([`docs/bonus_platform.md`](docs/bonus_platform.md)); the engineering criterion also looks at how cleanly you handle RBAC if you build it. Even so, seeded users with a `role` column are plenty — don't build real authentication. Get the core agent working first.
 
 **Do we actually send replies or refunds?** No. Put approved replies in an outbox (a file or a table) and record the refund as a decision. Nothing leaves your system.
 

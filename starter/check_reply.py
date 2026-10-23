@@ -2,6 +2,10 @@
 RM amount it mentions comes from the evidence. LLMs invent plausible numbers; this catches them.
 
 Usage: python starter/check_reply.py CMP-00012 "We have refunded RM45.90 for transaction TXN-0001234."
+
+In your agent, pass the complaint itself (the dict your API received, with customer_id and received_at), so the check
+also works for complaints that aren't in complaints.csv, like every complaint in the live round:
+    check_reply(db, complaint, reply_text)      # complaint = {"complaint_id": ..., "customer_id": ..., "received_at": ...}
 """
 import datetime as dt
 import re
@@ -10,10 +14,11 @@ import sys
 from data import load, received
 
 
-def allowed_facts(db, complaint_id):
+def allowed_facts(db, complaint):
     """Transaction IDs and amounts the reply may mention: the customer's transactions in the window, their reversals,
-    ATM journal amounts and shortfalls, fee schedule amounts and fee overcharges, and the policy thresholds."""
-    c = db.complaints[complaint_id]
+    ATM journal amounts and shortfalls, fee schedule amounts and fee overcharges, and the policy thresholds.
+    `complaint` is a complaint dict (needs customer_id and received_at) or the ID of a row in complaints.csv."""
+    c = db.complaints[complaint] if isinstance(complaint, str) else complaint
     recv = received(c)
     since = recv - dt.timedelta(days=int(db.params["MATCH_WINDOW_DAYS"]) + 1)
     ids, amounts = set(), {float(db.params["AUTO_REFUND_LIMIT_MYR"])}
@@ -30,8 +35,8 @@ def allowed_facts(db, complaint_id):
     return ids, amounts
 
 
-def check_reply(db, complaint_id, reply):
-    ids, amounts = allowed_facts(db, complaint_id)
+def check_reply(db, complaint, reply):
+    ids, amounts = allowed_facts(db, complaint)
     problems = []
     for tid in re.findall(r"TXN-\d{7}", reply):
         if tid not in ids:
