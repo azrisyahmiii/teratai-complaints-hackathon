@@ -62,11 +62,11 @@ TEXTS: dict[str, str] = {
     "Jumlah {refund} akan dikreditkan semula ke akaun anda " + REFUND_TIME + "." + CLOSE,
     "UNAUTHORISED_CARD.INVESTIGATE": OPEN
     + "Kami telah menerima laporan anda mengenai transaksi kad {txn} sebanyak {amount}{at} pada {date}. Pasukan "
-    "penipuan kami sedang menyiasat dan akan menghubungi anda dalam masa {sla_days} hari bekerja, kemudian akan memaklumkan perkembangan sekurang-kurangnya setiap "
+    "siasatan penipuan kami sedang meneliti transaksi ini dan akan menghubungi anda dalam masa {sla_days} hari bekerja, kemudian akan memaklumkan perkembangan sekurang-kurangnya setiap "
     "{update_days} hari bekerja. Belum ada keputusan mengenai pemulangan wang. Sila pastikan kad anda selamat dan maklumkan kepada kami dengan segera tentang "
     "sebarang transaksi lain yang anda tidak kenali." + CLOSE,
     "SCAM_TRANSFER.INVESTIGATE": OPEN
-    + "Kami memohon maaf atas kesulitan yang anda alami. Pasukan penipuan kami telah mula menyiasat "
+    + "Kami memohon maaf atas kesulitan yang anda alami. Pasukan siasatan penipuan kami telah mula meneliti "
     "pemindahan wang anda{to} sebanyak {amount} pada {date} (transaksi {txn}) dan akan cuba menuntut semula dana "
     "tersebut, walaupun pemulihan tidak dijamin. {scam_help} Kami akan memaklumkan perkembangan sekurang-kurangnya "
     "setiap {update_days} hari bekerja sehingga siasatan selesai." + CLOSE,

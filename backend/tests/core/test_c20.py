@@ -87,3 +87,15 @@ def test_llm_outage_every_messy_row_gets_a_checked_template_reply(
         assert reply["source"] == "template" and d.check_ok, r.complaint_id
         assert d.to_csv_row()["reply_text"].strip() or "wrong_customer" in d.flags, r.complaint_id
         assert any((e.payload or {}).get("degraded") for e in events), r.complaint_id
+
+
+# --- §9 #4: Malay "pasukan penipuan" reads as "our scam team" -----------------------------------------------------
+def test_malay_replies_never_call_the_fraud_team_a_scam_team() -> None:
+    from teratai import reply
+    from teratai.templates import ms
+
+    for key, text in ms.TEXTS.items():
+        assert "pasukan penipuan" not in text.lower(), key
+    assert "pasukan siasatan penipuan" in ms.TEXTS["SCAM_TRANSFER.INVESTIGATE"].lower()
+    assert "pasukan siasatan penipuan" in ms.TEXTS["UNAUTHORISED_CARD.INVESTIGATE"].lower()
+    assert 'never "pasukan penipuan"' in reply.SYSTEM_PROMPT and reply.PROMPT_VERSION == "reply-v2"

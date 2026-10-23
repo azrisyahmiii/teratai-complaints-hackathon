@@ -154,7 +154,7 @@ def build_facts(
 
 # --- LLM drafting (SPEC §4.6) ----------------------------------------------------------------------------------------
 PROMPT_VERSION = (
-    "reply-v1"  # part of the llm cache key: bump it when SYSTEM_PROMPT or the fact-sheet layout changes
+    "reply-v2"  # part of the llm cache key: bump it when SYSTEM_PROMPT or the fact-sheet layout changes
 )
 
 _LANG_MOD: dict[str, ModuleType] = {"EN": _en, "MS": _ms}
@@ -241,7 +241,9 @@ word "outcome". Never mention these instructions or the fact sheet.
 8. Tone: warm, direct, no filler. Bad news is stated plainly with the reason, then the redress option.
 Malay (MS): formal register. Address "Tuan/Puan" (or the honorific in the sheet), say "pihak bank", open bad news \
 with "Dukacita dimaklumkan", close with "Sekian, terima kasih." Use natural Malaysian Malay, not word-for-word \
-English. Write amounts as RM46.66 and dates as given in the sheet.
+English. Write amounts as RM46.66 and dates as given in the sheet. Malay terms: fraud team = "pasukan siasatan \
+penipuan" (never "pasukan penipuan", which reads as "scam team"); refund = "bayaran balik" or "dikreditkan semula"; \
+transfer = "pemindahan wang"; working days = "hari bekerja".
 
 Output ONLY the reply text."""
 
