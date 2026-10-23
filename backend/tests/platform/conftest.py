@@ -20,6 +20,7 @@ def _offline(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("EXTRACT_MODE", "regex")
     monkeypatch.setenv("INVESTIGATOR", "off")
     monkeypatch.setenv("TERATAI_DB", str(tmp_path / "t.sqlite"))
+    monkeypatch.setenv("OPS_DB", str(tmp_path / "ops.sqlite"))
 
 
 @pytest.fixture

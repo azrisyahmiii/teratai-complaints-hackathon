@@ -1,4 +1,4 @@
-"""Ops tests: the core runs in-process and offline; the ops app reaches it through a monkeypatched `core.client`."""
+"""Offline operations tests through the real platform app, login and permissions."""
 
 import csv
 import time
@@ -10,10 +10,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from teratai import config
-from teratai.ops import core
 
 FIELDS = ["complaint_id", "customer_id", "received_at", "channel", "subject", "text"]
-PASSWORD = "teratai-demo"
+PASSWORD = "000000"
 
 
 @pytest.fixture(autouse=True)
@@ -23,24 +22,24 @@ def _offline(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("INVESTIGATOR", "off")
     monkeypatch.setenv("TERATAI_DB", str(tmp_path / "core.sqlite"))
     monkeypatch.setenv("OPS_DB", str(tmp_path / "ops.sqlite"))
-    monkeypatch.setenv("OPS_DEMO_PASSWORD", PASSWORD)
 
 
 @pytest.fixture
-def core_client(monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
+def core_client() -> Iterator[TestClient]:
     from teratai.api.main import app
 
     with TestClient(app) as c:
-        monkeypatch.setattr(core, "client", lambda: c)
+        c.headers["X-Requested-With"] = "teratai"
+        assert c.post("/api/auth/login", json={"username": "asyraf", "password": PASSWORD}).status_code == 200
         yield c
 
 
 @pytest.fixture
 def login(core_client: TestClient) -> Callable[[str], TestClient]:
-    from teratai.ops.main import app
+    from teratai.api.main import app
 
     def _login(username: str) -> TestClient:
-        c = TestClient(app)
+        c = TestClient(app, headers={"X-Requested-With": "teratai"})
         r = c.post("/api/auth/login", json={"username": username, "password": PASSWORD})
         assert r.status_code == 200, r.text
         return c

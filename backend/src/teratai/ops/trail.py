@@ -43,7 +43,7 @@ def build(detail: dict[str, Any]) -> list[dict[str, Any]]:
         elif a == "escalate":
             lim = cases.money(_limit_of(who)) if _limit_of(who) else ""
             note = f"Over {who}'s {lim} limit. " if lim else ""
-            ops_steps.append(_step(e["ts"], who, "manager", "Escalated", f"{note}Reason: {e['reason']}".strip()))
+            ops_steps.append(_step(e["ts"], who, (cases.get_ops(cid) or {}).get("assigned_to") or "asyraf", "Escalated", f"{note}Reason: {e['reason']}".strip()))
         elif a == "fraud_ack":
             ops_steps.append(_step(e["ts"], who, "Fraud investigation", "Acknowledged", ""))
         elif a == "fraud_log":
@@ -69,4 +69,4 @@ def _role_of(username: str) -> str:
 
 def _limit_of(username: str) -> Any:
     u = auth.get_user(username)
-    return u.limit if u else None
+    return auth.limit(u) if u else None

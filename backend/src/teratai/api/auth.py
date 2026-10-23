@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from teratai import db
+from teratai.ops import db as ops_db
 
 router = APIRouter(prefix="/api")
 COOKIE = "teratai_session"
@@ -141,6 +142,13 @@ def action_block_reason(user: StaffUser, row: sqlite3.Row) -> str | None:
             return "A sensitive case requires manager approval."
         if Decimal(decision["refund_amount_myr"]) > Decimal(user.approval_limit_myr or "0"):
             return "This refund is above your approval limit and requires the manager."
+        with ops_db.connect() as con:
+            escalated = con.execute(
+                "SELECT 1 FROM ops_cases WHERE complaint_id=? AND ops_state='escalated'",
+                (row["complaint_id"],),
+            ).fetchone()
+        if escalated:
+            return "This case is escalated and requires manager approval."
     return None
 
 
@@ -179,6 +187,7 @@ def login(body: LoginIn, request: Request, response: Response) -> StaffUser:
         con.execute("DELETE FROM login_attempts WHERE username=? AND source=?", (username, source))
         token = secrets.token_urlsafe(32)
         con.execute("INSERT INTO sessions VALUES(?,?,?)", (_digest(token), row["id"], now + SESSION_SECONDS))
+    ops_db.add_event(None, username, row["role"], "login", None, None, None)
     response.set_cookie(
         COOKIE, token, max_age=SESSION_SECONDS, httponly=True, samesite="strict", path="/",
         secure=os.environ.get("AUTH_COOKIE_SECURE") == "1" or request.url.scheme == "https",

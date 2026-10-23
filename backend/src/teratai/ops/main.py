@@ -1,18 +1,5 @@
-"""Ops service app: `uv run fastapi run src/teratai/ops/main.py --port 8001` (CORE_URL points at the core API)."""
+"""Compatibility entry point: operations run inside the authenticated platform app."""
 
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from teratai.api import main
 
-from fastapi import FastAPI
-
-from teratai.ops import db, routes
-
-
-@asynccontextmanager
-async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    db.init()
-    yield
-
-
-app = FastAPI(title="Teratai ops service", lifespan=lifespan)
-app.include_router(routes.router)
+app = main.app

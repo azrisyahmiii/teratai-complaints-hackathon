@@ -8,6 +8,7 @@ from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
 
 from teratai.api import auth, routes_agent, routes_export, routes_ui, worker
+from teratai.ops import routes as ops_routes
 
 
 @asynccontextmanager
@@ -23,6 +24,7 @@ app.include_router(routes_agent.router)
 app.include_router(routes_export.router)
 app.include_router(routes_ui.router)
 app.include_router(auth.router)
+app.include_router(ops_routes.router)
 
 
 @app.middleware("http")

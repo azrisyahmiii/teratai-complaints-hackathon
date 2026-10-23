@@ -5,7 +5,9 @@ import threading
 from decimal import Decimal
 from typing import Any
 
-from teratai.ops import auth, core, db, settings
+from teratai import db as platform_db
+from teratai.api import routes_ui
+from teratai.ops import auth, db, settings
 
 AWAITING = "awaiting_approval"
 WITH_FRAUD = "with_fraud_team"
@@ -23,20 +25,18 @@ def money(d: Decimal | str) -> str:
 
 
 def _assign_target(con: sqlite3.Connection, role: str) -> str | None:
-    """The user of this role with the fewest open assigned cases (ties: username)."""
-    rows = con.execute(
-        "SELECT u.username FROM users u LEFT JOIN ops_cases c ON c.assigned_to=u.username AND c.ops_state!='closed'"
-        " WHERE u.role=? GROUP BY u.username ORDER BY COUNT(c.complaint_id), u.username",
-        (role,),
-    ).fetchall()
+    """Least loaded on-shift platform user; ties sort by username."""
+    with platform_db.connect() as staff:
+        users = staff.execute("SELECT username FROM users WHERE role=? ORDER BY username", (role,)).fetchall()
     shift = settings.on_shift()
-    names = [str(r["username"]) for r in rows if not shift or r["username"] in shift]
-    return names[0] if names else None
+    names = [str(r["username"]) for r in users if not shift or r["username"] in shift]
+    loads = dict(con.execute("SELECT assigned_to, COUNT(*) FROM ops_cases WHERE ops_state!='closed' GROUP BY assigned_to"))
+    return min(names, key=lambda name: (loads.get(name, 0), name)) if names else None
 
 
-def refresh() -> list[dict[str, Any]]:
+def refresh(user: auth.User) -> list[dict[str, Any]]:
     """Fetch the core's cases and bring the ops rows in line: new case -> ops row, agent_decided event, assignment."""
-    items: list[dict[str, Any]] = core.call("GET", "/api/cases")["items"]
+    items = routes_ui.list_cases(user).model_dump(mode="json")["items"]
     with _lock, db.connect() as con:
         for it in items:
             state = it["case_state"]
@@ -51,10 +51,10 @@ def refresh() -> list[dict[str, Any]]:
                     (cid, "open" if role else "closed", db.now()),
                 )
                 db.add_event(cid, "agent", "agent", "agent_decided", "case_state", None, state)
-                user = _assign_target(con, role) if role else None
-                if user:
-                    con.execute("UPDATE ops_cases SET assigned_to=? WHERE complaint_id=?", (user, cid))
-                    db.add_event(cid, "agent", "agent", "assign", "assigned_to", None, user, "Least loaded")
+                assigned_to = _assign_target(con, role) if role else None
+                if assigned_to:
+                    con.execute("UPDATE ops_cases SET assigned_to=? WHERE complaint_id=?", (assigned_to, cid))
+                    db.add_event(cid, "agent", "agent", "assign", "assigned_to", None, assigned_to, "Least loaded")
             elif state not in QUEUE_ROLE and row["ops_state"] != "closed":
                 con.execute("UPDATE ops_cases SET ops_state='closed', updated_at=? WHERE complaint_id=?",
                             (db.now(), cid))
@@ -76,7 +76,8 @@ def set_ops(complaint_id: str, **fields: Any) -> None:
 
 def ops_fields(complaint_id: str, user: auth.User | None, refund: str | None) -> dict[str, Any]:
     r = get_ops(complaint_id) or {}
-    over = bool(user and user.limit is not None and Decimal(refund or "0") > user.limit)
+    approval_limit = auth.limit(user) if user else None
+    over = approval_limit is not None and Decimal(refund or "0") > approval_limit
     return {
         "ops_state": r.get("ops_state", "closed"),
         "assigned_to": r.get("assigned_to"),
@@ -96,7 +97,7 @@ def _sort_key(c: dict[str, Any]) -> tuple[int, str]:
 
 
 def queue(user: auth.User) -> dict[str, Any]:
-    cases = sorted((ops_case(i, user) for i in refresh() if i["status"] == "done"), key=_sort_key)
+    cases = sorted((ops_case(i, user) for i in refresh(user) if i["status"] == "done"), key=_sort_key)
     if user.role == "officer":
         items = [c for c in cases if c["case_state"] == AWAITING and c["ops_state"] != "escalated"]
     elif user.role == "fraud":
@@ -112,8 +113,8 @@ def queue(user: auth.User) -> dict[str, Any]:
     return {"items": items, "counts": counts}
 
 
-def find(complaint_id: str, user: auth.User | None) -> dict[str, Any] | None:
-    for i in refresh():
+def find(complaint_id: str, user: auth.User) -> dict[str, Any] | None:
+    for i in refresh(user):
         if i["complaint_id"] == complaint_id and i["status"] == "done":
             return ops_case(i, user)
     return None
