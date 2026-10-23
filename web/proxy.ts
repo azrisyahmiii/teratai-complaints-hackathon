@@ -7,5 +7,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/queues/:path*", "/intake/:path*", "/outbox/:path*", "/cases/:path*"],
+  matcher: ["/queues/:path*", "/intake/:path*", "/outbox/:path*", "/cases/:path*", "/metrics/:path*"],
 }

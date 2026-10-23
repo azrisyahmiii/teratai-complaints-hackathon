@@ -251,6 +251,244 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ops/queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Queue */
+        get: operations["get_queue_api_ops_queue_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ops/escalations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Escalations */
+        get: operations["escalations_api_ops_escalations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ops/cases/{complaint_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Case View */
+        get: operations["case_view_api_ops_cases__complaint_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ops/cases/{complaint_id}/trail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Trail */
+        get: operations["get_trail_api_ops_cases__complaint_id__trail_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ops/cases/{complaint_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve */
+        post: operations["approve_api_ops_cases__complaint_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ops/cases/{complaint_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reject */
+        post: operations["reject_api_ops_cases__complaint_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ops/cases/{complaint_id}/escalate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Escalate */
+        post: operations["escalate_api_ops_cases__complaint_id__escalate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ops/cases/{complaint_id}/manager-approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Manager Approve */
+        post: operations["manager_approve_api_ops_cases__complaint_id__manager_approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ops/cases/{complaint_id}/manager-reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Manager Reject */
+        post: operations["manager_reject_api_ops_cases__complaint_id__manager_reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ops/cases/{complaint_id}/fraud-ack": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Fraud Ack */
+        post: operations["fraud_ack_api_ops_cases__complaint_id__fraud_ack_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ops/cases/{complaint_id}/fraud-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Fraud Log */
+        post: operations["fraud_log_api_ops_cases__complaint_id__fraud_log_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ops/cases/{complaint_id}/fraud-outcome": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Fraud Outcome */
+        post: operations["fraud_outcome_api_ops_cases__complaint_id__fraud_outcome_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Audit */
+        get: operations["audit_api_audit_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Metrics */
+        get: operations["get_metrics_api_metrics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -284,6 +522,16 @@ export interface components {
              * @default
              */
             actor: string;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+            /** Reply Text */
+            reply_text?: string | null;
+        };
+        /** ApproveIn */
+        ApproveIn: {
             /**
              * Reason
              * @default
@@ -611,6 +859,239 @@ export interface components {
             /** Errors */
             errors: number;
         };
+        /** MetricBucket */
+        MetricBucket: {
+            /** Key */
+            key: string;
+            /** Count */
+            count: number;
+            /** Amount Myr */
+            amount_myr?: string | null;
+        };
+        /** MetricDuration */
+        MetricDuration: {
+            /** Count */
+            count: number;
+            /** P50 Minutes */
+            p50_minutes: number | null;
+            /** P95 Minutes */
+            p95_minutes: number | null;
+        };
+        /** MetricFilters */
+        MetricFilters: {
+            /** Date From */
+            date_from: string | null;
+            /** Date To */
+            date_to: string | null;
+            /** Category */
+            category: string | null;
+            /** Channel */
+            channel: string | null;
+        };
+        /** MetricFraud */
+        MetricFraud: {
+            /** Total */
+            total: number;
+            /** Open */
+            open: number;
+            /** P1 Open */
+            p1_open: number;
+            /** Ack Overdue */
+            ack_overdue: number;
+            /** Amount Disputed Myr */
+            amount_disputed_myr: string;
+            /** By Category */
+            by_category: components["schemas"]["MetricBucket"][];
+            /** Acknowledged */
+            acknowledged: number | null;
+            /** Recall Attempts */
+            recall_attempts: number | null;
+            /** Outcomes */
+            outcomes: components["schemas"]["MetricBucket"][] | null;
+        };
+        /** MetricGuardrails */
+        MetricGuardrails: {
+            self_check_flagged: components["schemas"]["MetricRate"];
+            /** Reply Source */
+            reply_source: components["schemas"]["MetricBucket"][];
+            overrides: components["schemas"]["MetricRate"];
+            rejections: components["schemas"]["MetricRate"];
+            escalations: components["schemas"]["MetricRate"] | null;
+            /** Injection Suspected */
+            injection_suspected: number;
+            /** Degraded */
+            degraded: number;
+            /** Needs Info */
+            needs_info: number;
+            /** Vulnerable */
+            vulnerable: number;
+        };
+        /** MetricMoney */
+        MetricMoney: {
+            /** Refunds Paid Myr */
+            refunds_paid_myr: string;
+            /** Refunds Paid Count */
+            refunds_paid_count: number;
+            /** Avg Refund Myr */
+            avg_refund_myr: string | null;
+            /** Awaiting Approval Myr */
+            awaiting_approval_myr: string;
+            /** Awaiting Approval Count */
+            awaiting_approval_count: number;
+            /** Refunds By Category */
+            refunds_by_category: components["schemas"]["MetricBucket"][];
+        };
+        /** MetricOperations */
+        MetricOperations: {
+            /** Backlog */
+            backlog: components["schemas"]["MetricBucket"][];
+            /** Ack Overdue */
+            ack_overdue: number;
+            /** Ack Due 2H */
+            ack_due_2h: number;
+            turnaround: components["schemas"]["MetricDuration"];
+            /** Human Actions */
+            human_actions: number;
+        };
+        /** MetricOptions */
+        MetricOptions: {
+            /** Categories */
+            categories: string[];
+            /** Channels */
+            channels: string[];
+            /** Date Min */
+            date_min: string | null;
+            /** Date Max */
+            date_max: string | null;
+        };
+        /** MetricOutcomes */
+        MetricOutcomes: {
+            /** By Outcome */
+            by_outcome: components["schemas"]["MetricBucket"][];
+            /** By Route */
+            by_route: components["schemas"]["MetricBucket"][];
+            auto_resolve_rate: components["schemas"]["MetricRate"];
+        };
+        /** MetricPerformance */
+        MetricPerformance: {
+            /** Cases Measured */
+            cases_measured: number;
+            /** Latency P50 Ms */
+            latency_p50_ms: number | null;
+            /** Latency P95 Ms */
+            latency_p95_ms: number | null;
+            /** Cost Total Usd */
+            cost_total_usd: string | null;
+            /** Cost Per Complaint Usd */
+            cost_per_complaint_usd: string | null;
+            /** Llm Calls */
+            llm_calls: number;
+            /** Stages */
+            stages: components["schemas"]["MetricStage"][];
+        };
+        /** MetricRate */
+        MetricRate: {
+            /** Numerator */
+            numerator: number;
+            /** Denominator */
+            denominator: number;
+            /** Pct */
+            pct: number | null;
+        };
+        /** MetricStage */
+        MetricStage: {
+            /** Stage */
+            stage: string;
+            /** Count */
+            count: number;
+            /** P50 Ms */
+            p50_ms: number | null;
+            /** P95 Ms */
+            p95_ms: number | null;
+            /** Cost Usd */
+            cost_usd: string;
+            /** Tokens In */
+            tokens_in: number;
+            /** Tokens Out */
+            tokens_out: number;
+        };
+        /** MetricTeam */
+        MetricTeam: {
+            /**
+             * Team
+             * @enum {string}
+             */
+            team: "approval" | "fraud" | "auto";
+            /** Cases */
+            cases: number;
+            /** Open */
+            open: number;
+            /** P1 Open */
+            p1_open: number;
+            /** Ack Overdue */
+            ack_overdue: number;
+            /** Refund Total Myr */
+            refund_total_myr: string;
+            /** Flagged */
+            flagged: number;
+        };
+        /** MetricVolume */
+        MetricVolume: {
+            /** Total */
+            total: number;
+            /** Processing */
+            processing: number;
+            /** Errors */
+            errors: number;
+            /** By Day */
+            by_day: components["schemas"]["MetricBucket"][];
+            /** By Channel */
+            by_channel: components["schemas"]["MetricBucket"][];
+            /** By Category */
+            by_category: components["schemas"]["MetricBucket"][];
+            /** By Priority */
+            by_priority: components["schemas"]["MetricBucket"][];
+            /** By Language */
+            by_language: components["schemas"]["MetricBucket"][];
+        };
+        /** MetricsOut */
+        MetricsOut: {
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "manager" | "officer" | "fraud";
+            /** Run Id */
+            run_id: string;
+            /**
+             * Sim Now
+             * Format: date-time
+             */
+            sim_now: string;
+            filters: components["schemas"]["MetricFilters"];
+            options: components["schemas"]["MetricOptions"];
+            volume: components["schemas"]["MetricVolume"];
+            outcomes: components["schemas"]["MetricOutcomes"];
+            money: components["schemas"]["MetricMoney"] | null;
+            operations: components["schemas"]["MetricOperations"];
+            guardrails: components["schemas"]["MetricGuardrails"];
+            fraud: components["schemas"]["MetricFraud"] | null;
+            performance: components["schemas"]["MetricPerformance"];
+            /** Teams */
+            teams: components["schemas"]["MetricTeam"][] | null;
+            /** Unavailable */
+            unavailable: {
+                [key: string]: string;
+            };
+        };
+        /** NoteIn */
+        NoteIn: {
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
         /** OfficerFigures */
         OfficerFigures: {
             /** Waiting */
@@ -649,6 +1130,27 @@ export interface components {
             text: string;
             /** Authorised By */
             authorised_by: string;
+        };
+        /** OutcomeIn */
+        OutcomeIn: {
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "confirmed_fraud" | "not_fraud" | "recall_succeeded" | "recall_failed";
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+        };
+        /** ReasonIn */
+        ReasonIn: {
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
         };
         /** StaffActionIn */
         StaffActionIn: {
@@ -1149,6 +1651,478 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    get_queue_api_ops_queue_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    escalations_api_ops_escalations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    case_view_api_ops_cases__complaint_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                complaint_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_trail_api_ops_cases__complaint_id__trail_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                complaint_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_api_ops_cases__complaint_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                complaint_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApproveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_api_ops_cases__complaint_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                complaint_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    escalate_api_ops_cases__complaint_id__escalate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                complaint_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    manager_approve_api_ops_cases__complaint_id__manager_approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                complaint_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    manager_reject_api_ops_cases__complaint_id__manager_reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                complaint_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fraud_ack_api_ops_cases__complaint_id__fraud_ack_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                complaint_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fraud_log_api_ops_cases__complaint_id__fraud_log_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                complaint_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fraud_outcome_api_ops_cases__complaint_id__fraud_outcome_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                complaint_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OutcomeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    audit_api_audit_get: {
+        parameters: {
+            query?: {
+                complaint_id?: string | null;
+                actor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_metrics_api_metrics_get: {
+        parameters: {
+            query?: {
+                run_id?: string;
+                date_from?: string | null;
+                date_to?: string | null;
+                category?: string | null;
+                channel?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetricsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };

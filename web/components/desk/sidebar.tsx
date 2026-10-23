@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Suspense } from "react"
-import { Inbox, Leaf, MailCheck, Plus } from "lucide-react"
+import { BarChart3, Inbox, Leaf, MailCheck, Plus } from "lucide-react"
 
 import { cn } from "cn"
 import { LotusMark } from "./lotus-mark"
@@ -12,6 +12,7 @@ const NAV = [
   { href: "/queues", label: "Queues", icon: Inbox },
   { href: "/intake", label: "New complaint", icon: Plus },
   { href: "/outbox", label: "Outbox", icon: MailCheck },
+  { href: "/metrics", label: "Insights", icon: BarChart3 },
 ]
 
 function ActiveNav() {

@@ -8,15 +8,10 @@ from typing import Any
 from fastapi.testclient import TestClient
 
 from teratai import db, pipeline
-from teratai.api import routes_metrics
-from teratai.api.main import app
 from teratai.models import ComplaintRow
 
 from .conftest import complaint
 from .test_auth import HEADERS, load_cases, login
-
-if not any(getattr(r, "path", "") == "/api/metrics" for r in app.routes):
-    app.include_router(routes_metrics.router)
 
 MONEY = re.compile(r"^\d+\.\d{2}$")
 

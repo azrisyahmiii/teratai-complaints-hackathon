@@ -1,5 +1,7 @@
 # Leon: insights (metrics API + role-scoped dashboard)
 
+**Platform integration:** merged into `feat/platform`. The platform app registers `/api/metrics`; Insights is in the sidebar, `/metrics` uses the session redirect, and generated API types include the metrics contract. Tests use the production app without registering their own router. Escalation and fraud workflow measurements remain unavailable pending adaptation to the operations events. The remaining sections record the original branch implementation and handoff.
+
 Branch `feat/platform-leon` (from `origin/feat/platform` `a4f0b9b`). Allocation: [CURRENT-WORK.md](CURRENT-WORK.md).
 Requirement: the "Insights" section of [bonus_platform.md](../../bonus_platform.md) (dashboard only; no AI chat, no chart
 library). Read-only: this feature changes nothing and sends nothing.
