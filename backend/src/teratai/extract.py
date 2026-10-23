@@ -13,6 +13,7 @@ through `Decimal(str(x))`).
 """
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
@@ -27,52 +28,178 @@ from teratai.models import Category, ComplaintRow, Emit, Issue, StageEvent
 FeeType = Literal["monthly_service", "debit_annual", "cc_annual"]
 
 # --- amounts ---------------------------------------------------------------------------------------------
+# Grammar of a written amount (robustness review §5.1.1). A number is digits with optional thousands groups
+# ("1,200", "1 500", "3 967.30", "1.500") and optional decimals; an optional trailing k means thousand.
+# Forms: RM/MYR before ("RM 46.66", "rm4.4k"), ringgit/myr after ("600 ringgit", "46.66myr"), a bare "4.4k",
+# and number words next to "ringgit" ("seribu lima ratus ringgit", "one thousand five hundred ringgit").
+_NUM = r"(?:\d{1,3}(?:\.\d{3}(?!\d))+|\d{1,3}(?:[ ,]\d{3}(?!\d))+|\d+)(?:\.\d{1,2})?"
 _AMOUNT = re.compile(
-    r"(?:\b(?:RM|MYR)\s?(?P<a>\d[\d,]*(?:\.\d{1,2})?))|(?:(?P<b>\d[\d,]*(?:\.\d{1,2})?)\s*ringgit\b)",
+    rf"(?:\b(?:RM|MYR)\s?(?P<a>{_NUM})(?P<ak>\s?k\b)?)"
+    rf"|(?:(?<![\w.,])(?P<b>{_NUM})(?P<bk>k)?\s*(?:ringgit|myr)\b)"
+    r"|(?:(?<![\w.,])(?P<c>\d+(?:\.\d+)?)k\b)",
     re.IGNORECASE,
 )
-# Approximation marker directly before the amount ("about RM1,500", "lebih kurang RM1,200", "dalam RM400").
+# Approximation marker directly before the amount: a class of English / Malay / SMS forms, not a word list.
 _APPROX_BEFORE = re.compile(
-    r"(?:about|around|approx\.?|approximately|roughly|circa|~|lebih\s+kurang|kira-kira|sekitar|dalam)\s*$",
+    r"(?:about|abt|around|ard|approx\.?|approximately|roughly|circa|ca\.|~|≈|more\s+or\s+less|in\s+the\s+region\s+of|"
+    r"lebih\s+kurang|lbh\s+krg|lbh\s+kurang|lebih\s+krg|kira-?kira|kira\s?2|sekitar|dlm|dalam|lk)\s*$",
     re.IGNORECASE,
 )
-# An amount the customer *expected* or *received* is not the disputed charge (e.g. "charged RM20 ... thought it
-# is only RM10", "withdrew RM1,500 but got RM950"). Looked for between the previous sentence end and the amount.
+# An amount the customer *expected*, *received* or that is a balance / total / limit is not the disputed charge
+# (e.g. "charged RM20 ... thought it is only RM10", "withdrew RM1,500 but got RM950", "baki RM1,200 tp kena caj
+# RM46.66"). Looked for between the previous sentence end and the amount.
 _NOT_DISPUTED = re.compile(
     r"expected|thought|should\s+be|supposed|only\s+got|only\s+received|dispensed|"
-    r"ingat|sepatutnya|bukan|hanya\s+dapat|\bsahaja\b|\bonly\b",
+    r"ingat|sepatutnya|bukan|hanya\s+dapat|\bsahaja\b|\bonly\b|"
+    r"\bbaki\b|\bbalance\b|\bjumlah\s+baki\b|\btotal\s+balance\b|\blimit\b|\bhad\s+kad\b|\bavailable\b|\btinggal\b|"
+    r"\bremaining\b",
+    re.IGNORECASE,
+)
+# The verbs that sit next to the disputed amount (a charge, a deduction, a transfer, a withdrawal).
+_DISPUTE_VERB = re.compile(
+    r"charge[ds]?|\bcaj\w*|deduct\w*|debit\w*|potong\w*|tolak\w*|transfer\w*|\btrf\b|\btf\b|pindah\w*|"
+    r"withdr\w+|\bwd\b|tarik\w*|\bpay(?:ment|ed)?\b|\bbayar\w*|\bbyr\b|\bkena\b|\bkeluar\b|\bbuat\b",
     re.IGNORECASE,
 )
 _SENTENCE_END = re.compile(r"[.?!]\s")
 
+# Number words (Malay and English), for "seribu lima ratus ringgit" / "one thousand five hundred ringgit".
+_UNITS: dict[str, int] = {
+    "satu": 1, "dua": 2, "tiga": 3, "empat": 4, "lima": 5, "enam": 6, "tujuh": 7, "lapan": 8, "sembilan": 9,
+    "sepuluh": 10, "sebelas": 11,
+    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+    "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14, "fifteen": 15, "sixteen": 16, "seventeen": 17,
+    "eighteen": 18, "nineteen": 19,
+    "twenty": 20, "thirty": 30, "forty": 40, "fifty": 50, "sixty": 60, "seventy": 70, "eighty": 80, "ninety": 90,
+}  # fmt: skip
+_SCALES: dict[str, int] = {"ratus": 100, "hundred": 100, "ribu": 1000, "thousand": 1000, "seratus": 100, "seribu": 1000}
+_FILLER_WORDS = frozenset({"and", "dan", "puluh", "belas"})
+_NUMWORD = "|".join(sorted([*_UNITS, *_SCALES, *_FILLER_WORDS], key=len, reverse=True))
+_WORD_AMOUNT = re.compile(rf"\b(?P<w>(?:(?:{_NUMWORD})\b[\s-]*){{1,10}}?)\s*ringgit\b", re.IGNORECASE)
 
-def _amount_of(m: re.Match[str]) -> Decimal:
-    return Decimal((m.group("a") or m.group("b")).replace(",", ""))
+
+def words_to_number(words: str) -> int | None:
+    """Value of a run of number words ("seribu lima ratus" -> 1500, "two thousand" -> 2000), else None."""
+    total = current = 0
+    seen = False
+    prev_unit = 0
+    for w in re.findall(r"[a-z]+", words.lower()):
+        if w in _UNITS:
+            current += _UNITS[w]
+            prev_unit = _UNITS[w]
+        elif w == "puluh":  # "dua puluh" = 20, "lima puluh" = 50
+            current += (prev_unit or 1) * 10 - prev_unit
+        elif w == "belas":  # "dua belas" = 12
+            current += 10
+        elif w in _SCALES:
+            if w.startswith("se"):
+                current = current or 1
+            scale = _SCALES[w]
+            if scale == 100:
+                current = (current or 1) * 100
+            else:
+                total += (current or 1) * scale
+                current = 0
+            prev_unit = 0
+        elif w in _FILLER_WORDS:
+            continue
+        else:
+            return None
+        seen = True
+    value = total + current
+    return value if seen and value > 0 else None
+
+
+def parse_number(token: str, thousand: bool = False) -> Decimal | None:
+    """Digits as written ("1,200", "1 500", "3 967.30", "1.500", "4.4") to Decimal; `thousand` for a k suffix."""
+    t = token.strip()
+    if re.fullmatch(r"\d{1,3}(?:\.\d{3})+", t):
+        t = t.replace(".", "")  # "RM1.500" is one thousand five hundred
+    else:
+        t = t.replace(",", "").replace(" ", "")
+    try:
+        d = Decimal(t)
+    except InvalidOperation:
+        return None
+    if thousand:
+        d *= 1000
+    return d if d.is_finite() and d > 0 else None
+
+
+def parse_amount_text(text: str) -> tuple[Decimal | None, bool]:
+    """(value, rounded) of ONE written amount such as "RM 1 500", "rm4.4k", "46.66myr", "seribu lima ratus ringgit".
+
+    `rounded` is True for a k form. Used to check that an LLM-proposed value is derivable from its own quote.
+    """
+    found = _scan_amounts(text)
+    if found:
+        return found[0][1], found[0][2]
+    bare = re.fullmatch(rf"\s*(?P<n>{_NUM})(?P<k>k)?\s*", text, re.IGNORECASE)  # "8300.08", "4.4k"
+    if bare:
+        return parse_number(bare["n"], thousand=bool(bare["k"])), bool(bare["k"])
+    return None, False
+
+
+def _scan_amounts(text: str) -> list[tuple[int, Decimal, bool, int]]:
+    """(start, value, rounded_k, end) of every amount in `text`, in order of appearance."""
+    out: list[tuple[int, Decimal, bool, int]] = []
+    for m in _AMOUNT.finditer(text):
+        tok = m.group("a") or m.group("b") or m.group("c")
+        k = bool(m.group("ak") or m.group("bk") or m.group("c"))
+        v = parse_number(tok, thousand=k)
+        if v is not None:
+            out.append((m.start(), v, k, m.end()))
+    for m in _WORD_AMOUNT.finditer(text):
+        n = words_to_number(m.group("w"))
+        if n is not None and n >= 10:
+            out.append((m.start(), Decimal(n), False, m.end()))
+    return sorted(out)
 
 
 def amounts(text: str) -> list[tuple[Decimal, bool, bool]]:
-    """Every RM amount in order of appearance as (value, approximate, not_disputed)."""
+    """Every amount in order of appearance as (value, approximate, not_disputed).
+
+    Approximate: an approximation marker right before it, or a k form (rounded by nature).
+    """
     out: list[tuple[Decimal, bool, bool]] = []
-    for m in _AMOUNT.finditer(text):
-        before = text[: m.start()]
-        approx = _APPROX_BEFORE.search(before) is not None
+    prev_end = 0
+    for start, value, rounded, end in _scan_amounts(text):
+        before = text[:start]
+        approx = rounded or _APPROX_BEFORE.search(before) is not None
+        # The clause of this amount: from the sentence start or the previous amount, whichever is later.
         sentence_start = max((s.end() for s in _SENTENCE_END.finditer(before)), default=0)
-        clause = before[sentence_start:] + text[m.end() : m.end() + 12]
-        out.append((_amount_of(m), approx, _NOT_DISPUTED.search(clause) is not None))
+        sentence_start = max(sentence_start, prev_end)
+        prev_end = end
+        clause = before[sentence_start:] + text[end : end + 12]
+        out.append((value, approx, _NOT_DISPUTED.search(clause) is not None))
     return out
 
 
-def disputed_amount(text: str) -> tuple[Decimal | None, bool]:
+def _near_dispute_verb(text: str, start: int, end: int) -> bool:
+    return _DISPUTE_VERB.search(text[max(0, start - 28) : start]) is not None or (
+        _DISPUTE_VERB.search(text[end : end + 14]) is not None
+    )
+
+
+def disputed_amount(text: str, exclude: Sequence[Decimal] = ()) -> tuple[Decimal | None, bool]:
     """The amount most likely disputed, and whether it is approximate.
 
-    Rule: drop amounts the customer says they expected or received ("thought the fee is only RM10"), then take
-    the first remaining one; if every amount is dropped, take the first. Measured over train in `__main__`.
+    Rule: drop amounts the customer says they expected / received / that are a balance, total or limit, and any
+    amount the reader (LLM) listed as another role (`exclude`); if two or more remain, prefer one that sits next
+    to a charge / deduction / transfer / withdrawal verb; then take the first. If every amount is dropped, take the
+    first. Measured over train in `__main__`.
     """
+    spans = _scan_amounts(text)
     found = amounts(text)
     if not found:
         return None, False
-    pool = [a for a in found if not a[2]] or found
-    value, approx, _ = pool[0]
+    idx = [i for i, a in enumerate(found) if not a[2] and a[0] not in exclude]
+    if not idx:
+        idx = [i for i, a in enumerate(found) if not a[2]] or list(range(len(found)))
+    if len(idx) > 1:
+        near = [i for i in idx if _near_dispute_verb(text, spans[i][0], spans[i][3])]
+        idx = near or idx
+    value, approx, _ = found[idx[0]]
     return value, approx
 
 

@@ -41,6 +41,9 @@ AMOUNT_EXACT_TOL = _dec("AMOUNT_EXACT_TOL", "0.005")  # exact amount: |a - b| <=
 AMOUNT_APPROX_PCT = _dec("AMOUNT_APPROX_PCT", "0.05")  # approximate amount: within max(5%, RM25)
 # SPEC §4.4 says RM20; customers round to the nearest RM50 ("about RM250" for RM227.11), 12 train cases need 25.
 AMOUNT_APPROX_MIN_MYR = _dec("AMOUNT_APPROX_MIN_MYR", "25.00")
+# A round approximate amount ("about RM4,400", "4.4k") was rounded to its last non-zero digit: tolerance is half that
+# step (RM50), capped so "about RM10,000" does not swallow everything.
+AMOUNT_ROUNDING_MAX_STEP = _dec("AMOUNT_ROUNDING_MAX_STEP", "1000")
 INVESTIGATOR_MAX_CALLS = _int("INVESTIGATOR_MAX_CALLS", 5)  # SPEC §4.4b tool-loop budget
 UNIQUE_MARGIN = _int("UNIQUE_MARGIN", 2)  # top score must beat the runner-up by this much
 DUPLICATE_LATEST_GAP_MINUTES = _int("DUPLICATE_LATEST_GAP_MINUTES", 10)  # 3+ identical: predecessor gap

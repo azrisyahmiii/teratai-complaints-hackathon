@@ -163,8 +163,21 @@ def _amount_filter(issue: Issue) -> tuple[Decimal | None, Decimal | None]:
         return None, None
     if issue.amount_approx:
         floor = config.AMOUNT_APPROX_MIN_MYR
-        return issue.amount, max(issue.amount * config.AMOUNT_APPROX_PCT, floor)
+        return issue.amount, max(issue.amount * config.AMOUNT_APPROX_PCT, floor, rounding_half_step(issue.amount))
     return issue.amount, None
+
+
+def rounding_half_step(amount: Decimal) -> Decimal:
+    """Half the rounding step an approximate round amount implies: 4400 ("4.4k") was rounded to the nearest 100,
+    so the true amount lies within 50; 2000 within 500. Non-round amounts (46.66) imply no rounding: 0."""
+    if amount != amount.to_integral_value() or amount < 100:
+        return Decimal(0)
+    step = Decimal(1)
+    n = int(amount)
+    while n % 10 == 0 and step < config.AMOUNT_ROUNDING_MAX_STEP:
+        n //= 10
+        step *= 10
+    return step / 2 if step > 1 else Decimal(0)
 
 
 def _survivors(row: ComplaintRow, issue: Issue, window: DateWindow) -> list[Txn]:
