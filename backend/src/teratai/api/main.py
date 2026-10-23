@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 
 from teratai import pipeline
-from teratai.api import routes_agent, worker
+from teratai.api import routes_agent, routes_export, worker
 from teratai.api.schemas import CaseCreated, CaseDetail, CaseSummary
 from teratai.models import ComplaintRow
 
@@ -20,6 +20,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="Teratai complaints agent", lifespan=lifespan)
 app.include_router(routes_agent.router)
+app.include_router(routes_export.router)
 
 
 @app.get("/api/health")
