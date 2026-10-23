@@ -282,3 +282,29 @@ def test_single_issue_reply_has_no_note() -> None:
     d = process_complaint(data.complaint("CMP-00165"), "eval", events.append)
     assert "other_issues" not in d.facts.ids and "separately" not in d.reply_text
     assert [e for e in events if e.stage == "reply"][-1].payload["multi_issue"] is False
+
+
+# --- refund promises the check missed (judge-style API test: "Kami akan membayar semula" on a DECLINE was sent) -------
+PROMISES = [
+    ("MS", "Kami akan membayar semula."), ("MS", "Kami akan memberi pemulangan wang."),
+    ("MS", "Pihak bank akan pulangkan wang anda."), ("MS", "Kami akan kreditkan semula jumlah itu."),
+    ("MS", "Kami akan memberikan pampasan kepada anda."), ("MS", "Wang anda akan dibayar semula."),
+    ("EN", "We will make a refund of RM10.00 to you."), ("EN", "We will give you a refund."),
+    ("EN", "We will provide a full refund."), ("EN", "You will get your money back."),
+    ("EN", "We will offer you compensation."), ("EN", "We are sending you a refund."),
+]  # fmt: skip
+REFUSALS = [
+    ("MS", "Pihak bank tidak akan membayar semula jumlah ini."), ("MS", "Kami tidak dapat memberikan pemulangan wang."),
+    ("MS", "Belum ada keputusan mengenai pemulangan wang."),  # INVESTIGATE template wording: the noun alone is fine
+    ("EN", "We are unable to give you a refund."), ("EN", "We cannot offer compensation."),
+    ("EN", "We will not make a refund."), ("EN", "You will not get your money back from us for this charge."),
+]  # fmt: skip
+
+
+@pytest.mark.parametrize("language, sentence, flagged", [(lg, s, True) for lg, s in PROMISES] + [(lg, s, False) for lg, s in REFUSALS])
+def test_refund_promises_are_caught_on_a_decline(language: str, sentence: str, flagged: bool) -> None:
+    from teratai import check, data
+
+    facts = process_complaint(data.complaint(_first("ATM_NOT_DISPENSED", "DECLINE", language)), "eval").facts
+    assert facts.outcome == "DECLINE"
+    assert any(i.code == "OUTCOME" for i in check.check_reply(sentence, facts).issues) is flagged

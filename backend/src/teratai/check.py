@@ -73,7 +73,19 @@ REFUND_VERBS: tuple[str, ...] = (
     r"\brefund\s+(?:will\s+be|has\s+been|have\s+been|is\s+being)\s+(?:issued|approved|processed|initiated|paid|credited)\b",
     r"\breturn\s+(?:your|the)\s+(?:money|funds?|payment)\b",
     r"\breimburs(?:e|es|ing|ement)\b",
-    r"\b(?:issue|process|processing|arrange)\s+(?:you\s+)?(?:a|the|your)\s+refund\b",
+    (
+        r"\b(?:issue|process|processing|arrange|make|making|give|giving|provide|providing|send|sending|offer|offering|grant)"
+        r"\s+(?:you\s+)?(?:a|the|your)\s+(?:full\s+)?refund\b"
+    ),
+    r"\bget\s+(?:your\s+|the\s+)?(?:money|funds?|payment)\s+back\b",
+    r"\b(?:pay|paying|offer|offering|give|giving|provide|providing)\s+(?:you\s+)?(?:any\s+|a\s+)?compensation\b",
+    # MS: a verb must lead, so the noun alone ("keputusan mengenai pemulangan wang") stays allowed
+    r"\bmembayar\s+semula\b",
+    r"\bbayar\s+semula\b",
+    r"\bmemberi(?:kan)?\s+(?:anda\s+)?(?:pemulangan|bayaran\s+balik|pampasan|ganti\s+rugi)\b",
+    r"\bpulangkan\b",
+    r"\bkembalikan\b",
+    r"\bkreditkan\b",
     r"\bmembayar\s+balik\b",
     r"\bbayar\s+balik\b",
     r"\bbayaran\s+balik\b",
@@ -93,7 +105,7 @@ FACTUAL_PAST_VERBS: tuple[str, ...] = (
     r"\bdikreditkan(?:\s+semula)?\b",
     r"\bdikembalikan\b",
     r"\bdipulangkan\b",
-    r"\bdibayar\s+balik\b",
+    r"\bdibayar\s+(?:balik|semula)\b",
 )
 _REFUND_RES = [re.compile(p, re.IGNORECASE) for p in REFUND_VERBS]
 _FACTUAL_RES = [re.compile(p, re.IGNORECASE) for p in FACTUAL_PAST_VERBS]
