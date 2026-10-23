@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 
+import pytest
 from fastapi.testclient import TestClient
 
 from teratai.ops.main import app
@@ -56,6 +57,14 @@ def test_queues(login: Login) -> None:
     assert ids(fq["items"]) == {"CMP-00387"} and fq["items"][0]["assigned_to"] in ("siti", "raj")
     mq = login("manager").get("/api/ops/queue").json()
     assert ids(mq["items"]) == {"CMP-00244", "CMP-00289", "CMP-00387"}  # auto-resolved is not open work
+
+
+def test_on_shift_limits_assignment(login: Login, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OPS_ON_SHIFT", "aina,siti,manager")
+    aina = login("aina")
+    submit(aina, ALL)
+    assert {i["assigned_to"] for i in aina.get("/api/ops/queue").json()["items"]} == {"aina"}
+    assert {i["assigned_to"] for i in login("siti").get("/api/ops/queue").json()["items"]} == {"siti"}
 
 
 def test_officer_approves_within_limit(login: Login, core_client: TestClient) -> None:

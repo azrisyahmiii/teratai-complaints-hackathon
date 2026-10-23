@@ -20,6 +20,11 @@ def db_path() -> Path:
     return Path(os.environ.get("OPS_DB", config.VAR_DIR / "ops.sqlite"))
 
 
+def on_shift() -> set[str]:
+    """OPS_ON_SHIFT="aina,siti,manager" limits auto-assignment to those users (the demo cast); empty means everyone."""
+    return {u.strip() for u in os.environ.get("OPS_ON_SHIFT", "").split(",") if u.strip()}
+
+
 def secret() -> str:
     return os.environ.get("OPS_SECRET", DEV_SECRET)
 

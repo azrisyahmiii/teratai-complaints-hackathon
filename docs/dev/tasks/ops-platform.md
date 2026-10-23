@@ -24,6 +24,8 @@ browser ── Next (Dev C's UI, built with API_URL=http://localhost:8001)
 ```
 - Start: `cd backend && CORE_URL=http://10.0.30.214:8000 uv run fastapi run src/teratai/ops/main.py --port 8001`
 - Never restart or change the core API on :8000. The ops service only calls it.
+- Demo: add `OPS_ON_SHIFT=aina,siti,manager` so new cases are assigned only to the demo cast.
+- The judges' hidden-test cases (`HID*`) show up in the queues: never act on them.
 - `next build` fixes the API address at build time: always build the UI with `API_URL=http://localhost:8001`.
 - The judges' live complaints land on the core API, so they appear in the ops platform as well.
 
@@ -93,7 +95,7 @@ All need role `fraud` (or `manager`), `409` when the case is not `with_fraud_tea
   "field": "case_state" | "ops_state" | "assigned_to" | "reply_text" | null,
   "from": "awaiting_approval", "to": "approved", "reason": "Journal confirms the shortfall"}]}
 ```
-Append-only. Show `from` and `to` as two plain columns (DESIGN.md: no strikethrough).
+Append-only. Also `field: "fraud_outcome"` (to = the outcome), `login` rows (no complaint_id) and `agent` `assign` rows. Show `from` and `to` as two plain columns (DESIGN.md: no strikethrough).
 
 ### Case trail: from whom to whom
 `GET /api/ops/cases/{id}/trail` (also inside `GET /api/ops/cases/{id}`) → oldest first:

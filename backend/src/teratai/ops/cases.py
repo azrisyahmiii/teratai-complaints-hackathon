@@ -5,7 +5,7 @@ import threading
 from decimal import Decimal
 from typing import Any
 
-from teratai.ops import auth, core, db
+from teratai.ops import auth, core, db, settings
 
 AWAITING = "awaiting_approval"
 WITH_FRAUD = "with_fraud_team"
@@ -24,12 +24,14 @@ def money(d: Decimal | str) -> str:
 
 def _assign_target(con: sqlite3.Connection, role: str) -> str | None:
     """The user of this role with the fewest open assigned cases (ties: username)."""
-    r = con.execute(
+    rows = con.execute(
         "SELECT u.username FROM users u LEFT JOIN ops_cases c ON c.assigned_to=u.username AND c.ops_state!='closed'"
-        " WHERE u.role=? GROUP BY u.username ORDER BY COUNT(c.complaint_id), u.username LIMIT 1",
+        " WHERE u.role=? GROUP BY u.username ORDER BY COUNT(c.complaint_id), u.username",
         (role,),
-    ).fetchone()
-    return str(r["username"]) if r else None
+    ).fetchall()
+    shift = settings.on_shift()
+    names = [str(r["username"]) for r in rows if not shift or r["username"] in shift]
+    return names[0] if names else None
 
 
 def refresh() -> list[dict[str, Any]]:
