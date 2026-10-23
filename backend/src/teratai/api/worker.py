@@ -18,7 +18,7 @@ def warm_up() -> None:
     """Fill every lazy cache before serving. Otherwise a burst of first requests (the hidden test sends 20 at
     once) makes each thread load the 156k-row transactions file at the same time: ~40 s instead of ~1 s."""
     db.init()
-    classify._artifact()
+    classify.warm()  # every CSV and the classifier (thread-safe loaders, Core C20)
     saved = {k: os.environ.get(k) for k in _OFFLINE}
     os.environ.update(_OFFLINE)
     try:
