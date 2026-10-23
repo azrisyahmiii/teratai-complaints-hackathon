@@ -1,21 +1,551 @@
-"""Transaction matcher (SPEC §4.4, calls the investigator §4.4b itself).
+"""Transaction matcher (SPEC §4.4). Pure code: hard filters, tie-break scores, the unique rule.
 
-P4a stub: returns the CMP-00165 gold match; C6 replaces it.
+`match_case` never guesses: a match must be the only survivor or lead the runner-up by UNIQUE_MARGIN.
+Otherwise the status is NONE / AMBIGUOUS, the (stub) investigator gets one chance (§4.4b), and anything it
+returns is re-validated against the hard filters here. Weights, tolerances and channel families live in
+`config.py`. Clues come from `u.issues[0]`; counterparty names are matched against candidates in code.
 """
 
-from teratai.models import Candidate, ComplaintRow, DateWindow, Emit, MatchResult, StageEvent, Understanding
+import re
+import time
+from collections.abc import Callable
+from datetime import date
+from decimal import Decimal
+from difflib import SequenceMatcher
+
+from teratai import classify, config, data, extract, investigate, tools
+from teratai.data import Txn
+from teratai.models import (
+    Candidate,
+    ComplaintRow,
+    DateWindow,
+    Emit,
+    Issue,
+    MatchResult,
+    StageEvent,
+    Understanding,
+)
+
+_MONTH_ABBR = ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
+
+# Fee transaction description prefixes, by Issue.fee_type.
+_FEE_NAMES: dict[str, str] = {
+    "monthly_service": "Monthly service charge",
+    "debit_annual": "Debit card annual fee",
+    "cc_annual": "Credit card annual fee",
+}
+# Fallback when the extractor gave no fee_type: first pattern that hits the complaint text wins.
+_FEE_TYPE_HINTS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("cc_annual", re.compile(r"credit card|kad kredit|\bcc\b", re.IGNORECASE)),
+    ("debit_annual", re.compile(r"debit", re.IGNORECASE)),
+    ("monthly_service", re.compile(r"service charge|servis|perkhidmatan|monthly|bulanan", re.IGNORECASE)),
+)
+# Product -> words a complaint uses to name the account (tie-break between two accounts with the same fee).
+_PRODUCT_WORDS: dict[str, tuple[str, ...]] = {
+    "Basic Savings": ("basic savings", "basic"),
+    "Savings Plus": ("savings plus",),
+    "Current Account": ("current account", "current", "akaun semasa"),
+    "Credit Card Classic": ("classic",),
+    "Credit Card Platinum": ("platinum",),
+}
+_PRODUCT_NAMED = config.SCORE_WEIGHTS["product_named"]
+
+# Categories where `card_last4` names the customer's own card (on transfers it is the payee's account).
+_CARD_CATEGORIES = frozenset({"DUPLICATE_CHARGE", "UNAUTHORISED_CARD", "ATM_NOT_DISPENSED"})
+
+# Words that appear in many merchant / recipient names and prove nothing on their own.
+_NAME_NOISE = frozenset(
+    [
+        "bin",
+        "binti",
+        "a/p",
+        "a/l",
+        "apl",
+        "sdn",
+        "bhd",
+        "ltd",
+        "the",
+        "and",
+        "online",
+        "store",
+        "shop",
+        "travel",
+        "bank",
+        "transfer",
+    ]
+)
+_WORD = re.compile(r"[a-z0-9/]+")
+
+# The investigator (§4.4b, `investigate.py`) proposes a txn id; `_run` re-validates it against the hard filters.
+Investigator = Callable[[ComplaintRow, Understanding, DateWindow, list[Candidate], Emit], str | None]
+
+
+def _investigate(
+    row: ComplaintRow, u: Understanding, window: DateWindow, candidates: list[Candidate], emit: Emit
+) -> str | None:
+    """The investigator's proposed txn id that passes the hard filters, else None (NEEDS_INFO)."""
+    result = investigate.investigate(row, u, window, candidates, emit)
+    if result is None or result.txn_id is None:
+        return None
+    if not _validate_investigator(result.txn_id, row, u.issues[0], window, f"{row.subject} {row.text}"):
+        emit(
+            StageEvent(
+                stage="investigate",
+                ok=False,
+                latency_ms=0,
+                payload={"kind": "rejected", "txn_id": result.txn_id, "reason": "failed the hard filters"},
+            )
+        )
+        return None
+    return result.txn_id
+
+
+# --- scoring helpers -------------------------------------------------------------------------------
+
+
+def _tokens(s: str) -> set[str]:
+    return {w for w in _WORD.findall(s.lower()) if len(w) >= 3}
+
+
+def _squash(s: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", s.lower())
+
+
+def party_similarity(merchant: str, span: str) -> float:
+    """0..1 similarity of a named payee / merchant span to a candidate's merchant.
+
+    1.0 when one contains the other ignoring case, spaces and punctuation ("Go Ride" / GoRide), or they share a
+    significant word. Otherwise the best edit-distance ratio of the whole squash or of a word pair, so a typo
+    ("gamevalt" / GameVault) scores high and an unrelated name low (robustness review §5.1.4).
+    """
+    m, s = _squash(merchant), _squash(span)
+    if not m or not s:
+        return 0.0
+    if (len(s) >= 4 and s in m) or (len(m) >= 4 and m in s):
+        return 1.0
+    mt = {w for w in _tokens(merchant) if w not in _NAME_NOISE}
+    st = {w for w in _tokens(span) if w not in _NAME_NOISE}
+    if mt & st:
+        return 1.0
+    best = SequenceMatcher(None, m, s).ratio()
+    for a in mt:
+        for b in st:
+            if len(a) >= 4 and len(b) >= 4:
+                best = max(best, SequenceMatcher(None, a, b).ratio())
+    return best
+
+
+def counterparty_hit(merchant: str, clue: str | None, text: str) -> bool:
+    """Case-insensitive token / substring hit of a candidate's merchant against the clue, else the text.
+
+    `paycoin` is a hit for `PAYCOIN LTD`; `shalini` for `Shalini a/p Nair`. Name particles never count. The clue
+    also hits when it is close by edit distance (a typo or different spacing), see `party_similarity`.
+    """
+    m = merchant.lower().strip()
+    if not m:
+        return False
+    if clue is not None and not extract.is_name_span(clue):
+        clue = None  # an account phrase or a date word is not a name
+    if clue and party_similarity(merchant, clue) >= config.PARTY_HIT_RATIO:
+        return True
+    sources = [clue, text] if clue else [text]
+    sig = {w for w in _tokens(m) if w not in _NAME_NOISE}
+    for src in sources:
+        if not src:
+            continue
+        s = src.lower()
+        if m in s or (clue is not None and src is clue and s.strip() and s.strip() in m):
+            return True
+        if sig & _tokens(s):
+            return True
+    return False
+
+
+def _date_score(t: Txn, window: DateWindow) -> tuple[str, int] | None:
+    d = t.txn_time.date()
+    if window.exact_day is not None and d == window.exact_day:
+        return "date_exact_day", config.SCORE_WEIGHTS["date_exact_day"]
+    # An exact day is searched over day-1..day+1 for posting lag; those slack days are not "in the range".
+    if window.exact_day is None and window.start <= d <= window.end:
+        return "date_in_range", config.SCORE_WEIGHTS["date_in_range"]
+    return None
+
+
+def _score(t: Txn, issue: Issue, window: DateWindow, text: str) -> Candidate:
+    w = config.SCORE_WEIGHTS
+    b: dict[str, int] = {}
+    if issue.amount is not None and tools.amount_matches(t.amount, issue.amount):
+        b["amount_exact"] = w["amount_exact"]
+    elif issue.amount is not None and issue.amount_approx:
+        b["amount_approx"] = w["amount_approx"]  # survived the approximate-amount filter
+    if counterparty_hit(t.merchant, issue.counterparty, text):
+        b["counterparty"] = w["counterparty"]
+    ds = _date_score(t, window)
+    if ds:
+        b[ds[0]] = ds[1]
+    if issue.card_last4 and issue.card_last4 in (t.card_last4, t.counterparty_account[-4:]):
+        b["card_last4"] = w["card_last4"]  # a card, or "account ending ..." on a transfer
+    return Candidate(txn_id=t.txn_id, score=sum(b.values()), breakdown=b)
+
+
+# --- candidate generation per category -------------------------------------------------------------
+
+
+def _amount_filter(issue: Issue) -> tuple[Decimal | None, Decimal | None]:
+    """(amount, tol) for `find_transactions`: exact, or max(5%, RM25) when the customer is approximate."""
+    if issue.amount is None:
+        return None, None
+    if issue.amount_approx:
+        floor = config.AMOUNT_APPROX_MIN_MYR
+        return issue.amount, max(issue.amount * config.AMOUNT_APPROX_PCT, floor, rounding_half_step(issue.amount))
+    return issue.amount, None
+
+
+def rounding_half_step(amount: Decimal) -> Decimal:
+    """Half the rounding step an approximate round amount implies: 4400 ("4.4k") was rounded to the nearest 100,
+    so the true amount lies within 50; 2000 within 500. Non-round amounts (46.66) imply no rounding: 0."""
+    if amount != amount.to_integral_value() or amount < 100:
+        return Decimal(0)
+    step = Decimal(1)
+    n = int(amount)
+    while n % 10 == 0 and step < config.AMOUNT_ROUNDING_MAX_STEP:
+        n //= 10
+        step *= 10
+    return step / 2 if step > 1 else Decimal(0)
+
+
+def _survivors(row: ComplaintRow, issue: Issue, window: DateWindow) -> list[Txn]:
+    """Hard filters (SPEC §4.4). Customers round approximate amounts to the nearest RM50 ("about RM250" for
+    RM227.11), which max(5%, RM20) misses, so approximate amounts use max(5%, RM25). A wider net can only
+    add candidates, and the unique rule turns a tie into AMBIGUOUS rather than a guess."""
+    amount, tol = _amount_filter(issue)
+    return tools.find_transactions(
+        row.customer_id, window.start, window.end, config.CHANNEL_FAMILIES[issue.category],
+        amount=amount, tol=tol,
+    )  # fmt: skip
+
+
+def _duplicate_pick(t: Txn, group: list[Txn]) -> tuple[bool, Txn | None, int]:
+    """(has predecessor, predecessor, gap in minutes) of `t` inside its identical-charge group."""
+    i = group.index(t)
+    if i == 0:
+        return False, None, 0
+    pred = group[i - 1]
+    return True, pred, int((t.txn_time - pred.txn_time).total_seconds() // 60)
+
+
+def _duplicate_candidates(row: ComplaintRow, issue: Issue, window: DateWindow) -> dict[str, Txn | None]:
+    """Later charge of each identical group -> its earlier sibling (SPEC §4.4 DUPLICATE_CHARGE).
+
+    Per group of identical charges (same card, merchant, amount): the latest charge whose predecessor is
+    within DUPLICATE_LATEST_GAP_MINUTES, else the latest charge that has a predecessor. With no identical
+    sibling anywhere, the plain survivors stand (the policy then declines).
+    """
+    surv = _survivors(row, issue, window)
+    family = set(config.CHANNEL_FAMILIES["DUPLICATE_CHARGE"])
+    all_debits = [t for t in data.txns_for(row.customer_id) if t.direction == "DR" and t.channel in family]
+    groups: dict[tuple[str, str, Decimal], list[Txn]] = {}
+    for t in all_debits:
+        groups.setdefault((t.card_last4, t.merchant, t.amount), []).append(t)
+    picked: dict[str, Txn | None] = {}
+    seen: set[tuple[str, str, Decimal]] = set()
+    for t in surv:
+        key = (t.card_last4, t.merchant, t.amount)
+        if key in seen:
+            continue
+        seen.add(key)
+        group = groups[key]
+        in_window = [s for s in surv if (s.card_last4, s.merchant, s.amount) == key]
+        with_pred = [(s, *_duplicate_pick(s, group)[1:]) for s in in_window if _duplicate_pick(s, group)[0]]
+        close = [x for x in with_pred if x[2] <= config.DUPLICATE_LATEST_GAP_MINUTES]
+        pool = close or with_pred
+        if pool:
+            best = pool[-1]
+            picked[best[0].txn_id] = best[1]
+    if not picked:
+        picked = {t.txn_id: None for t in surv}
+    return picked
+
+
+def _infer_fee_type(issue: Issue, text: str) -> str | None:
+    if issue.fee_type:
+        return issue.fee_type
+    for fee_type, pat in _FEE_TYPE_HINTS:
+        if pat.search(text):
+            return fee_type
+    return None
+
+
+def _fee_period(t: Txn) -> str:
+    """'YYYY-MM' a fee belongs to: the month in a monthly-charge description, else the charge month."""
+    m = re.search(r"([A-Za-z]{3}) (\d{4})$", t.description)
+    if m and m.group(1).lower() in _MONTH_ABBR:
+        return f"{m.group(2)}-{_MONTH_ABBR.index(m.group(1).lower()) + 1:02d}"
+    return t.txn_time.strftime("%Y-%m")
+
+
+def _fee_candidates(row: ComplaintRow, issue: Issue, window: DateWindow, text: str) -> list[Candidate]:
+    w = config.SCORE_WEIGHTS
+    fee_type = _infer_fee_type(issue, text)
+    prefix = _FEE_NAMES.get(fee_type) if fee_type else None
+    fees = tools.find_transactions(
+        row.customer_id, date.min, date.max, config.CHANNEL_FAMILIES["FEE_DISPUTE"], description_prefix=prefix
+    )
+    if issue.fee_month:
+        fees = [t for t in fees if _fee_period(t) == issue.fee_month]
+    else:
+        fees = [t for t in fees if window.start <= t.txn_time.date() <= window.end]
+    low = text.lower()
+    out: list[Candidate] = []
+    for t in fees:
+        b: dict[str, int] = {}
+        if prefix:
+            b["fee_type_month"] = w["fee_type_month"]
+        if issue.amount is not None and tools.amount_matches(t.amount, issue.amount):
+            b["amount_exact"] = w["amount_exact"]
+        product = data.account(t.account_id).product
+        if any(word in low for word in _PRODUCT_WORDS.get(product, ())):
+            b["product_named"] = _PRODUCT_NAMED
+        out.append(Candidate(txn_id=t.txn_id, score=sum(b.values()), breakdown=b))
+    return out
+
+
+# --- decision --------------------------------------------------------------------------------------
+
+
+def _rank(cands: list[Candidate]) -> list[Candidate]:
+    """Best score first; equal scores keep txn_id order, so the result is deterministic."""
+    return sorted(cands, key=lambda c: (-c.score, c.txn_id))
+
+
+def _decide(cands: list[Candidate]) -> tuple[str, str | None]:
+    """Unique rule: the only survivor, or a top score at least UNIQUE_MARGIN above the runner-up, and the
+    winner must carry at least one discriminating clue (an amount, a name, the exact day, a card, a fee type
+    and month). A lone transaction that only fits the channel and the date range is a guess: never guess."""
+    if not cands:
+        return "NONE", None
+    if len(cands) == 1 or cands[0].score >= cands[1].score + config.UNIQUE_MARGIN:
+        if config.DISCRIMINATING_SIGNALS & cands[0].breakdown.keys():
+            return "UNIQUE", cands[0].txn_id
+        return ("NONE" if len(cands) == 1 else "AMBIGUOUS"), None
+    return "AMBIGUOUS", None
+
+
+def _low_category_confidence(u: Understanding) -> bool:
+    """The classifier alone chose the category, below tau: its label may be wrong, so no money moves on it
+    (SPEC §2 risk lean). Rules and LLM decisions are not held to tau. Goes away once the LLM tier (C11) answers."""
+    issue = u.issues[0]
+    if u.source != "classifier" or issue.category == "SCAM_TRANSFER" or not u.top3:
+        return False  # scam always ends in INVESTIGATE, so a wrong guess there pays nothing out
+    return u.top3[0][1] < classify.tau()
+
+
+def _related(txn_id: str, sibling: Txn | None) -> dict[str, str]:
+    rel: dict[str, str] = {}
+    if sibling is not None:
+        rel["sibling"] = sibling.txn_id
+    rev = data.reversal_of(txn_id) or (data.reversal_of(sibling.txn_id) if sibling else None)
+    if rev is not None:
+        rel["reversal"] = rev.txn_id
+    if data.atm_journal(txn_id) is not None:
+        rel["journal"] = txn_id
+    return rel
+
+
+def _named_party(issue: Issue, text: str) -> str | None:
+    """The payee / merchant the complaint names: the extractor's verbatim span, else a regex span ("to Ahmad")."""
+    for span in (issue.counterparty, extract.counterparty_span(text)):
+        if extract.is_name_span(span):  # an account phrase / number / date word is never a name
+            return span
+    return None
+
+
+def _party_mismatch(t: Txn, issue: Issue, text: str) -> bool:
+    """The complaint names a payee / merchant and this transaction's counterparty is clearly not it. Only the
+    named span is compared (not the whole text), so one stray word cannot rescue a wrong transaction. A soft
+    signal: a typo or different spacing is a hit (+3), a middling similarity is merely not a hit, and only a clear
+    mismatch (similarity < PARTY_VETO_RATIO) vetoes the transaction."""
+    if issue.category == "FEE_DISPUTE":
+        return False  # a fee has no payee: it is matched on fee type + month
+    party = _named_party(issue, text)
+    return party is not None and party_similarity(t.merchant, party) < config.PARTY_VETO_RATIO
+
+
+def _fee_fits(t: Txn, issue: Issue, window: DateWindow, text: str) -> bool:
+    """Same filters as `_fee_candidates`: fee type prefix, then the month (or the window), plus a stated amount."""
+    fee_type = _infer_fee_type(issue, text)
+    prefix = _FEE_NAMES.get(fee_type) if fee_type else None
+    if prefix and not t.description.startswith(prefix):
+        return False
+    if issue.fee_month:
+        if _fee_period(t) != issue.fee_month:
+            return False
+    elif not (window.start <= t.txn_time.date() <= window.end):
+        return False
+    return issue.amount is None or tools.amount_matches(t.amount, issue.amount)
+
+
+def _has_evidence(t: Txn, issue: Issue, window: DateWindow, text: str) -> bool:
+    """A discriminating signal from the clues, or straight from the complaint text (the investigator reads text the
+    regex may have missed): the txn amount written in it (within the approximate tolerance) or its card digits."""
+    if config.DISCRIMINATING_SIGNALS & _score(t, issue, window, text).breakdown.keys():
+        return True
+    tol = max(t.amount * config.AMOUNT_APPROX_PCT, config.AMOUNT_APPROX_MIN_MYR)
+    if any(abs(a - t.amount) <= (tol if approx else config.AMOUNT_EXACT_TOL) for a, approx, *_ in extract.amounts(text)):
+        return True
+    return bool(t.card_last4) and t.card_last4 == extract.card_last4(text)
+
+
+def _validate_investigator(txn_id: str, row: ComplaintRow, issue: Issue, window: DateWindow, text: str) -> bool:
+    """The investigator's pick must pass every hard filter and contradict no clue, or it is ignored (SPEC §4.4b).
+
+    Ownership, debit, channel family; then the same filters the matcher applies (window + amount, or fee type +
+    month) and at least one discriminating signal; then the clues that exist: the card digits and the named payee / merchant. Nothing is skipped.
+    """
+    if not data.has_txn(txn_id):
+        return False
+    t = data.txn(txn_id)
+    if t.customer_id != row.customer_id or t.direction != "DR":
+        return False
+    if t.channel not in config.CHANNEL_FAMILIES[issue.category]:
+        return False
+    if issue.category == "FEE_DISPUTE":
+        if not _fee_fits(t, issue, window, text):
+            return False
+    elif txn_id not in {s.txn_id for s in _survivors(row, issue, window)}:
+        return False
+    # The investigator may break a tie, never guess: its pick needs the same discriminating evidence the matcher
+    # requires for UNIQUE (amount, payee, card digits or fee type + month), not the date alone (SPEC §2).
+    if issue.category != "FEE_DISPUTE" and not _has_evidence(t, issue, window, text):
+        return False
+    if issue.card_last4 and issue.category in _CARD_CATEGORIES and t.card_last4 != issue.card_last4:
+        return False
+    return not _party_mismatch(t, issue, text)
+
+
+def _candidates(
+    row: ComplaintRow, issue: Issue, window: DateWindow, text: str
+) -> tuple[list[Candidate], dict[str, Txn | None]]:
+    """Scored candidates, best first, and the earlier identical charge of each duplicate candidate."""
+    siblings: dict[str, Txn | None] = {}
+    if issue.category == "FEE_DISPUTE":
+        cands = _fee_candidates(row, issue, window, text)
+    elif issue.category == "DUPLICATE_CHARGE":
+        siblings = _duplicate_candidates(row, issue, window)
+        cands = [_score(data.txn(tid), issue, window, text) for tid in siblings]
+    else:
+        surv = _survivors(row, issue, window)
+        if not surv and _is_round(issue):
+            # The customer gave a round figure ("600 ringgit" for RM577.87) with no "about": retry at the rounding
+            # tolerance. These candidates carry `amount_rounded`, which is NOT a discriminating signal, so one of
+            # them wins only on a payee name or card digits, never on its rounded amount alone.
+            relaxed = issue.model_copy(update={"amount_approx": True})
+            cands = []
+            for t in _survivors(row, relaxed, window):
+                c = _score(t, relaxed, window, text)
+                b = {("amount_rounded" if k == "amount_approx" else k): v for k, v in c.breakdown.items()}
+                cands.append(Candidate(txn_id=c.txn_id, score=c.score, breakdown=b))
+        else:
+            cands = [_score(t, issue, window, text) for t in surv]
+    return _rank(cands), siblings
+
+
+def _is_round(issue: Issue) -> bool:
+    """A whole amount of at least RM100 that is a multiple of 50: a figure people round to."""
+    a = issue.amount
+    return (
+        a is not None
+        and not issue.amount_approx
+        and a >= 100
+        and a == a.to_integral_value()
+        and int(a) % 50 == 0
+        and issue.category in ("FAILED_TRANSFER", "SCAM_TRANSFER", "UNAUTHORISED_CARD", "ATM_NOT_DISPENSED")
+    )
+
+
+def probe_unique(row: ComplaintRow, issue: Issue, window: DateWindow) -> str | None:
+    """The txn id the matcher would pick for `issue` without the investigator, or None (none / ambiguous / vetoed).
+
+    Used to settle a category disagreement (SPEC section 4.2 step 3, evidence consistency): the category under which
+    the complaint's clues single out one transaction is the better reading. Pure, no events.
+    """
+    if issue.category == "SERVICE_QUALITY":
+        return None
+    text = f"{row.subject} {row.text}"
+    cands, _ = _candidates(row, issue, window, text)
+    status, txn_id = _decide(cands)
+    if status != "UNIQUE" or txn_id is None or _party_mismatch(data.txn(txn_id), issue, text):
+        return None
+    return txn_id
+
+
+def _run(row: ComplaintRow, u: Understanding, window: DateWindow, emit: Emit) -> tuple[MatchResult, str | None]:
+    """The match, and the reason (if any) it was held back from UNIQUE for the trace."""
+    issue = u.issues[0]
+    text = f"{row.subject} {row.text}"
+
+    def result(status: str, txn_id: str | None, cands: list[Candidate], rel: dict[str, str]) -> MatchResult:
+        return MatchResult.model_validate(
+            {"status": status, "txn_id": txn_id, "window": window, "candidates": cands, "related": rel,
+             "source": "matcher"}
+        )  # fmt: skip
+
+    if issue.category == "SERVICE_QUALITY":
+        return result("NO_TXN", None, [], {}), None
+    if extract.third_party_cue(text):
+        return result("WRONG_CUSTOMER", None, [], {}), "third_party_cue"
+    if (
+        issue.card_last4
+        and issue.category in _CARD_CATEGORIES
+        and issue.card_last4 not in tools.owned_card_last4(row.customer_id)
+    ):
+        return result("WRONG_CUSTOMER", None, [], {}), "card_not_owned"
+
+    cands, siblings = _candidates(row, issue, window, text)
+    status, txn_id = _decide(cands)
+    reason: str | None = None
+    if status == "UNIQUE" and txn_id and _party_mismatch(data.txn(txn_id), issue, text):
+        status, txn_id, reason = "AMBIGUOUS", None, "counterparty_mismatch"  # the named payee is someone else
+    elif status == "UNIQUE" and _low_category_confidence(u):
+        status, txn_id, reason = "AMBIGUOUS", None, "low_category_confidence"
+
+    if status != "UNIQUE":
+        picked = _investigate(row, u, window, cands, emit)
+        if picked and _validate_investigator(picked, row, issue, window, text):
+            if all(c.txn_id != picked for c in cands):
+                cands.append(Candidate(txn_id=picked, score=0, breakdown={"investigator": 0}))
+            r = result("UNIQUE", picked, cands, _related(picked, siblings.get(picked)))
+            return r.model_copy(update={"source": "investigator"}), reason
+
+    rel = _related(txn_id, siblings.get(txn_id)) if txn_id else {}
+    return result(status, txn_id, cands, rel), reason
 
 
 def match_case(row: ComplaintRow, u: Understanding, window: DateWindow, emit: Emit) -> MatchResult:
-    m = MatchResult(
-        status="UNIQUE",
-        txn_id="TXN-0115572",
-        window=window,
-        candidates=[
-            Candidate(txn_id="TXN-0115572", score=6, breakdown={"amount": 3, "counterparty": 3}),
-        ],
-        related={"sibling": "TXN-0115571"},
-        source="matcher",
+    """Find the disputed transaction (SPEC §4.4). Emits one `match` StageEvent with candidates and scores."""
+    t0 = time.perf_counter()
+    m, reason = _run(row, u, window, emit)
+    issue = u.issues[0]
+    emit(
+        StageEvent(
+            stage="match",
+            ok=m.status in ("UNIQUE", "NO_TXN"),
+            latency_ms=int((time.perf_counter() - t0) * 1000),
+            payload={
+                "status": m.status,
+                "txn_id": m.txn_id,
+                "source": m.source,
+                "reason": reason,
+                "category": issue.category,
+                "window": {
+                    "start": window.start.isoformat(),
+                    "end": window.end.isoformat(),
+                    "exact_day": window.exact_day.isoformat() if window.exact_day else None,
+                    "phrase": window.phrase,
+                },
+                "candidates": [c.model_dump() for c in m.candidates],
+                "related": m.related,
+            },
+        )
     )
-    emit(StageEvent(stage="match", ok=True, latency_ms=0, payload={"stub": True}))
     return m

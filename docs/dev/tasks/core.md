@@ -1,5 +1,8 @@
 # Core tasks (Dev A, branch `feat/core`)
 
+> **Dev B / integrator: start with [core-handoff.md](core-handoff.md).** It covers what this branch contains, how to
+> merge it, and what Platform builds next.
+
 Owns the accuracy path: data → understand → match → decide → reply → check → batch. File globs are in
 [contracts.md §4](contracts.md). Read SPEC §1, §3, §4, §6, §12 and DEMO §1 and §3 before starting.
 
@@ -38,5 +41,12 @@ Owns the accuracy path: data → understand → match → decide → reply → c
 | C15 | Multi-issue split (§5); first to cut | `classify.py`, `extract.py` | — | C11 | `B uv run pytest tests/core -q -k multi` → a 2-issue adversarial row yields 2 issues + a `multi_issue` flag | Could |
 | C16 · bonus | Fraud workbench screen (§7.2) on B's components and endpoints (P15), **after CP2 only** | `web/app/fraud/**` | new shared components (ask B) | CP2, P15 | `cd web && npm run typecheck && npm run lint && npm run build` clean; `playwright-cli -s=a1 screenshot --filename=shots/c16-fraud.png` shows CMP-00387 with 3DS-OTP, Acknowledge → Log recall attempt | Should (bonus) |
 
-**Cut order** (§16): C15 → C14 → C16 → C12 → C11. Never cut C5, C7, C8, C9 or C13.
+| C17 · W6 | **Honest messy eval harness** ([robustness review](../reviews/2026-10-23-robustness.md) §4).<br>- **Dev set:** the 109 reviewer rows.<br>- **Blind hold-out:** 40–60 rows, Sonnet from the §5.4 style card, BA-reviewed, never tuned against.<br>- A live-mode runner with field scoring and a bootstrap interval, plus the group-K-fold classifier accuracy | `backend/tests/core/fixtures/messy_dev*.csv`, a runner in `batch.py` (`--eval`), `eval/messy_holdout*.csv` (BA) | tuning on the hold-out | C11, C12 | `B uv run python -m teratai.batch --eval messy_dev --run messy` → score with its 95% interval, criticals, miss taxonomy; group-K-fold accuracy printed | Must |
+| C18 · W6 | **LLM reads, code verifies, code decides** ([robustness review](../reviews/2026-10-23-robustness.md) §0, §5, §7):<br>0. LLM-first extraction on every complaint (LLM-primary merge with code verification, LLM-primary category plus the classifier cross-check, upgraded extract prompt)<br>1. counterparty as a soft, fuzzy signal<br>2. amount grammar plus an approx-marker class<br>3. closed-vocabulary normalised dates<br>4. clue-only normaliser<br>5. disputed-amount choice<br>6. language tie-break<br>7. τ from group-K-fold<br>**Failing pattern-grid test first per mechanism** | `extract.py`, `classify.py`, `lang.py`, `dates.py`, `match.py`, `investigate.py`, `config.py`, fixtures | policy, refund, route, txn selection (stay code) | C17 | messy-dev ≥ 92, 0 criticals; train and test-style 100.00 / 0 critical; matcher 1750/1750; hold-out reported at CP2 and freeze | Must |
+| C19 · W6 | **WRONG_CUSTOMER reply is non-empty** (the updated brief rejects empty replies): a verification reply naming no txn, amount or payee, routed HUMAN_APPROVAL so it waits (`sent: false`) | `policy.py`, `reply.py`, `templates/**`, tests | — | C7 | `B uv run pytest tests/core -q -k wrong_customer` → reply non-empty, passes the check, route HUMAN_APPROVAL | Must |
+
+C13 must **finish before 14:30**: the 15:00 PR needs the freeze commit hash and the API URL
+([brief-changes review](../reviews/2026-10-23-brief-changes.md)).
+
+**Cut order** (§16): C15 → C14 → C16 → C12 → C11. Never cut C5, C7, C8, C9, C13, C17, C18 or C19.
 **Hand-offs to Platform:** contract proposals and package requests go in reports. At CP1, tell B which IDs regress.

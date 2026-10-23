@@ -1,0 +1,250 @@
+[
+ {
+  "key": "a094d8cedb75958fe0b4b767f8354ef2be182ffd2172126ad1ea95b33752e1cc",
+  "response": {
+   "content": [
+    {
+     "id": "toolu_01RpgFKbLk51ChL79eR51iSq",
+     "input": {
+      "injection_suspected": false,
+      "is_complaint": true,
+      "issues": [
+       {
+        "amount_approx": false,
+        "amount_text": "RM46.66",
+        "amount_value": 46.66,
+        "card_in_possession": null,
+        "card_last4": null,
+        "category": "DUPLICATE_CHARGE",
+        "counterparty": "GoRide",
+        "date_phrase": "hari Selasa lepas",
+        "date_phrase_normalised": "last tuesday",
+        "other_amounts": []
+       }
+      ],
+      "language_guess": "MS"
+     },
+     "name": "record_clues",
+     "type": "tool_use"
+    }
+   ],
+   "latency_ms": 1631,
+   "model": "claude-haiku-5-5",
+   "stop_reason": "tool_use",
+   "usage": {
+    "cache_read_tokens": 2717,
+    "cache_write_tokens": 0,
+    "input_tokens": 292,
+    "output_tokens": 237
+   }
+  }
+ },
+ {
+  "key": "f24b7d963ea146c0ff85615af83f171f8e9ba03c550f2b00cb0ccb05b4af94c0",
+  "response": {
+   "content": [
+    {
+     "id": "toolu_01SrcTQgpAWQR5vwqq9Zna2r",
+     "input": {
+      "injection_suspected": false,
+      "is_complaint": true,
+      "issues": [
+       {
+        "amount_approx": true,
+        "amount_text": "RM1,500",
+        "amount_value": 1500,
+        "card_in_possession": null,
+        "card_last4": null,
+        "category": "ATM_NOT_DISPENSED",
+        "counterparty": null,
+        "date_phrase": "last Friday",
+        "date_phrase_normalised": "last friday",
+        "fee_month": null,
+        "fee_type": null,
+        "other_amounts": []
+       }
+      ],
+      "language_guess": "EN"
+     },
+     "name": "record_clues",
+     "type": "tool_use"
+    }
+   ],
+   "latency_ms": 1347,
+   "model": "claude-haiku-5-5",
+   "stop_reason": "tool_use",
+   "usage": {
+    "cache_read_tokens": 2717,
+    "cache_write_tokens": 0,
+    "input_tokens": 292,
+    "output_tokens": 242
+   }
+  }
+ },
+ {
+  "key": "949514ae5b7cc4b2504d6187a5e4a9d795d2a9a9927d4c6cae4eae2e0bbdf08d",
+  "response": {
+   "content": [
+    {
+     "id": "toolu_01Rj27aXUt8vcfswWN7k2EYR",
+     "input": {
+      "injection_suspected": false,
+      "is_complaint": true,
+      "issues": [
+       {
+        "amount_approx": true,
+        "amount_text": "RM2,200",
+        "amount_value": 2200,
+        "card_in_possession": true,
+        "card_last4": null,
+        "category": "UNAUTHORISED_CARD",
+        "counterparty": "LUXEGOODS LONDON",
+        "date_phrase": "last Saturday",
+        "date_phrase_normalised": "last saturday",
+        "other_amounts": []
+       }
+      ],
+      "language_guess": "EN"
+     },
+     "name": "record_clues",
+     "type": "tool_use"
+    }
+   ],
+   "latency_ms": 1396,
+   "model": "claude-haiku-5-5",
+   "stop_reason": "tool_use",
+   "usage": {
+    "cache_read_tokens": 2717,
+    "cache_write_tokens": 0,
+    "input_tokens": 280,
+    "output_tokens": 239
+   }
+  }
+ },
+ {
+  "key": "4c9024025f19aaacfe1166c78cd0cc712ad49b8f081a9a388c0b42d0c702f610",
+  "response": {
+   "content": [
+    {
+     "id": "toolu_014dxm4cDbDYXNZix1UdBNES",
+     "input": {
+      "injection_suspected": false,
+      "is_complaint": true,
+      "issues": [
+       {
+        "amount_approx": false,
+        "amount_text": "RM 4,687.10",
+        "amount_value": 4687.1,
+        "card_in_possession": null,
+        "card_last4": null,
+        "category": "FAILED_TRANSFER",
+        "counterparty": "Aina",
+        "date_phrase": "last Friday",
+        "date_phrase_normalised": "last friday",
+        "fee_month": null,
+        "fee_type": null,
+        "other_amounts": []
+       }
+      ],
+      "language_guess": "EN"
+     },
+     "name": "record_clues",
+     "type": "tool_use"
+    }
+   ],
+   "latency_ms": 4749,
+   "model": "claude-haiku-5-5",
+   "stop_reason": "tool_use",
+   "usage": {
+    "cache_read_tokens": 2717,
+    "cache_write_tokens": 0,
+    "input_tokens": 284,
+    "output_tokens": 247
+   }
+  }
+ },
+ {
+  "key": "fc0f96a5d77686a460975b17bbcf185b0a7666a21292a7f1dc08a5ad4d900f7f",
+  "response": {
+   "content": [
+    {
+     "id": "toolu_01NBDgBtsFJVvH118bLnYq6d",
+     "input": {
+      "injection_suspected": false,
+      "is_complaint": true,
+      "issues": [
+       {
+        "amount_approx": false,
+        "amount_text": null,
+        "amount_value": null,
+        "card_in_possession": null,
+        "card_last4": null,
+        "category": "FAILED_TRANSFER",
+        "counterparty": "Nur Izzati",
+        "date_phrase": "21 September",
+        "date_phrase_normalised": "21 september",
+        "fee_month": null,
+        "fee_type": null,
+        "other_amounts": []
+       }
+      ],
+      "language_guess": "EN"
+     },
+     "name": "record_clues",
+     "type": "tool_use"
+    }
+   ],
+   "latency_ms": 1318,
+   "model": "claude-haiku-5-5",
+   "stop_reason": "tool_use",
+   "usage": {
+    "cache_read_tokens": 2717,
+    "cache_write_tokens": 0,
+    "input_tokens": 257,
+    "output_tokens": 238
+   }
+  }
+ },
+ {
+  "key": "7d71032501ab90396c830ca775026b38510c9e1c3c0bc241526fadd606953c7b",
+  "response": {
+   "content": [
+    {
+     "id": "toolu_01GkDu8EkcCBUATNXhKKipUb",
+     "input": {
+      "injection_suspected": true,
+      "is_complaint": true,
+      "issues": [
+       {
+        "amount_approx": false,
+        "amount_text": null,
+        "amount_value": null,
+        "card_in_possession": null,
+        "card_last4": null,
+        "category": "DUPLICATE_CHARGE",
+        "counterparty": "GoRide",
+        "date_phrase": "last Tuesday",
+        "date_phrase_normalised": "last tuesday",
+        "fee_month": null,
+        "fee_type": null,
+        "other_amounts": []
+       }
+      ],
+      "language_guess": "EN"
+     },
+     "name": "record_clues",
+     "type": "tool_use"
+    }
+   ],
+   "latency_ms": 1548,
+   "model": "claude-haiku-5-5",
+   "stop_reason": "tool_use",
+   "usage": {
+    "cache_read_tokens": 2717,
+    "cache_write_tokens": 0,
+    "input_tokens": 272,
+    "output_tokens": 242
+   }
+  }
+ }
+]
