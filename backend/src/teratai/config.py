@@ -34,6 +34,17 @@ MATCH_WINDOW_DAYS = _int("MATCH_WINDOW_DAYS", 45)
 CLASSIFY_USE_OOF = os.environ.get("CLASSIFY_USE_OOF", "1") != "0"  # train IDs use OOF probabilities
 CLASSIFY_TAU = os.environ.get("CLASSIFY_TAU")  # optional fixed tau; default = chosen from OOF at train time
 
+def extract_mode() -> str:
+    """`llm` (default): the LLM reads every complaint, code verifies (robustness review section 0). `regex`: the
+    regex + classifier path alone (tests, and the outage fallback). Read at call time so a test can switch it."""
+    return "regex" if os.environ.get("EXTRACT_MODE", "llm").strip().lower() == "regex" else "llm"
+
+
+# The model's EN / MS reading may break a MIXED tie on short text (robustness review 5.2). OFF by default: the training
+# labels send "app asyik logout sendiri 3 hari dah, tak boleh bayar bil" (EN 1 / MS 4) to preferred_language, the very
+# case the tie-break would flip, so it would cost leaderboard points. Set LANG_LLM_TIEBREAK=1 to enable.
+LANG_LLM_TIEBREAK = os.environ.get("LANG_LLM_TIEBREAK", "0") == "1"
+
 # --- matcher (SPEC §4.4) -------------------------------------------------------------------------
 MATCH_WINDOW_SLACK_DAYS = _int("MATCH_WINDOW_SLACK_DAYS", 1)  # extra day on the 45-day window
 DATE_SLACK_DAYS = _int("DATE_SLACK_DAYS", 1)  # exact day D is searched over [D - 1, D + 1]

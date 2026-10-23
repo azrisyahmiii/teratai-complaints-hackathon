@@ -34,7 +34,7 @@ from sklearn.metrics import classification_report
 from sklearn.model_selection import StratifiedKFold, cross_val_predict
 from sklearn.pipeline import FeatureUnion, Pipeline
 
-from teratai import config, data, extract, lang
+from teratai import config, data, dates, extract, lang
 from teratai.models import Category, ComplaintRow, Emit, Mode, StageEvent, Understanding
 
 TARGET_ACCEPTED_ACCURACY = 0.99  # accepted (conf >= tau) OOF items must be at least this accurate
@@ -293,15 +293,14 @@ def decide_category(
 
 
 def _needs_llm(mode: Mode, probs: NDF, scam_cue: bool, classes: list[str], threshold: float) -> str | None:
-    """Why the LLM tier should run (SPEC §4.2 Tier 2), or None. Live: always; batch: low conf or tier conflict."""
-    if mode == "live":
-        return "live"
-    label = classes[int(probs.argmax())]
-    if float(probs.max()) < threshold:
-        return "low_confidence"
-    if scam_cue and label != "SCAM_TRANSFER":
-        return "tier_conflict"
-    return None
+    """Why the LLM tier should run (robustness review section 0), or None.
+
+    `EXTRACT_MODE=llm` (default): the LLM reads every complaint, batch and live alike. `EXTRACT_MODE=regex`: never
+    (tests, and the outage fallback): the classifier and the regex clues stand alone.
+    """
+    if config.extract_mode() == "regex":
+        return None
+    return "live" if mode == "live" else "llm_first"
 
 
 def _llm_extract(
@@ -312,20 +311,90 @@ def _llm_extract(
     return extract.llm_issue(row, emit)
 
 
+# When the two readers disagree and no clue singles out a transaction under either category, prefer the category
+# whose no-match outcome is INVESTIGATE (SPEC section 6): it can never pay a wrongful refund or miss a fraud.
+_SAFETY_ORDER: tuple[str, ...] = ("SCAM_TRANSFER", "UNAUTHORISED_CARD")
+
+
+def _resolve_disagreement(
+    row: ComplaintRow, rx: extract.Issue, first: extract.Issue, detail: extract.LLMDetail | None, text: str,
+    injection: bool, cls_cat: str, llm_cat: str, probs: NDF, classes: list[str], threshold: float, scam_cue: bool,
+) -> tuple[Category, str, str]:
+    """(category, source, how) for a classifier / LLM disagreement.
+
+    1. scam precedence: a scam cue and either reader says SCAM_TRANSFER -> SCAM_TRANSFER.
+    2. the category under which the merged clues single out ONE transaction (SPEC section 4.2 step 3).
+    3. the safe default (INVESTIGATE-first), else the classifier when confident, else the LLM.
+    """
+    from teratai import match  # lazy: match imports this module
+
+    if scam_cue and "SCAM_TRANSFER" in (cls_cat, llm_cat):
+        return "SCAM_TRANSFER", "rules", "scam_precedence"
+    cls_conf = float(probs[classes.index(cls_cat)]) if cls_cat in classes else 0.0
+    unique: dict[str, str | None] = {}
+    for cat in (cls_cat, llm_cat):
+        issue = extract.merge_issue(rx.model_copy(update={"category": cat}), first, text, cat, injection,  # type: ignore[arg-type]
+                                    detail, row.received_at)
+        window = dates.resolve_window(issue.date_phrase, row.received_at)
+        unique[cat] = match.probe_unique(row, issue, window)
+    cls_ok, llm_ok = unique[cls_cat] is not None, unique[llm_cat] is not None
+    if cls_ok != llm_ok:
+        return (cls_cat, "classifier", "unique_match") if cls_ok else (llm_cat, "llm", "unique_match")  # type: ignore[return-value]
+    how = "both_unique" if cls_ok else "safe_default"
+    for cat in _SAFETY_ORDER:
+        if cat in (cls_cat, llm_cat):
+            return cat, ("classifier" if cat == cls_cat else "llm"), how  # type: ignore[return-value]
+    if cls_conf >= threshold:
+        return cls_cat, "classifier", how  # type: ignore[return-value]
+    return llm_cat, "llm", how  # type: ignore[return-value]
+
+
 def _merge_llm(
     row: ComplaintRow, base: Understanding, llm: extract.LLMExtraction, probs: NDF, classes: list[str],
     threshold: float,
-) -> tuple[Understanding, str]:
-    """Fold the LLM answer into the understanding: category per decide_category, clues merged, language stays code."""
+) -> tuple[Understanding, str, dict[str, Any] | None]:
+    """Fold the LLM answer into the understanding: LLM primary, classifier cross-check, code verifies every clue.
+
+    Agreement -> accept. Disagreement -> `_resolve_disagreement`. Then scam precedence on the result (SPEC step 4).
+    Returns the understanding, the decision reason and the disagreement record (None when they agree).
+    """
     first = llm.issues[0]
+    detail = llm.details[0] if llm.details else None
     injection = base.injection_suspected or llm.injection_suspected
-    category, source, reason = decide_category(probs, classes, base.scam_cue, threshold, llm_label=first.category)
     text = f"{row.subject} {row.text}".strip()
-    issue = extract.merge_issue(extract.regex_issue(row, category), first, text, category, injection)
+    cls_cat, llm_cat = base.issues[0].category, first.category
+    rx = extract.regex_issue(row, cls_cat)
+    disagreement: dict[str, Any] | None = None
+    if cls_cat == llm_cat:
+        category, source, how = cls_cat, "rules" if base.source == "rules" else "llm", "agree"
+        reason = f"LLM and classifier agree: {category}"
+    else:
+        category, source, how = _resolve_disagreement(
+            row, rx, first, detail, text, injection, cls_cat, llm_cat, probs, classes, threshold, base.scam_cue
+        )
+        cls_conf = float(probs[classes.index(cls_cat)]) if cls_cat in classes else 0.0
+        disagreement = {
+            "classifier": cls_cat,
+            "classifier_conf": round(cls_conf, 4),
+            "llm": llm_cat,
+            "resolved": category,
+            "by": how,
+        }
+        reason = f"classifier {cls_cat} vs LLM {llm_cat}: {category} by {how}"
+    chosen_conf = float(probs[classes.index(category)]) if category in classes else 0.0
+    if base.scam_cue and category in ("FAILED_TRANSFER", "UNAUTHORISED_CARD") and chosen_conf < SCAM_PRECEDENCE_CONF:
+        category, source = "SCAM_TRANSFER", "rules"
+        reason += f"; scam cue overrides (conf {chosen_conf:.2f} < {SCAM_PRECEDENCE_CONF})"
+    issue = extract.merge_issue(
+        extract.regex_issue(row, category), first, text, category, injection, detail, row.received_at
+    )
+    language, language_reason = lang.reply_language(row, llm.language)
     merged = base.model_copy(
         update={
             "issues": [issue],
             "source": source,
+            "language": language,
+            "language_reason": language_reason,
             # Not a complaint when the rules OR the LLM say so. Either verdict only changes the reply (a polite
             # generic acknowledgement, and only when the outcome is INFO_ONLY): policy never reads this flag.
             "is_complaint": base.is_complaint and llm.is_complaint,
@@ -333,7 +402,7 @@ def _merge_llm(
             "top3": _top3(probs, classes, first=category),
         }
     )
-    return merged, reason
+    return merged, reason, disagreement
 
 
 def understand(row: ComplaintRow, mode: Mode, emit: Emit) -> Understanding:
@@ -355,12 +424,12 @@ def understand(row: ComplaintRow, mode: Mode, emit: Emit) -> Understanding:
         scam_cue=t0r.scam_cue,
     )
     llm_reason = _needs_llm(mode, probs, t0r.scam_cue, art.classes, threshold)
-    result, llm_called, llm_note = base, False, None
+    result, llm_called, llm_note, disagreement = base, False, None, None
     if llm_reason is not None:
         llm = _llm_extract(row, base, llm_reason, emit)
         llm_called = llm is not None
         if llm is not None:
-            result, reason = _merge_llm(row, base, llm, probs, art.classes, threshold)
+            result, reason, disagreement = _merge_llm(row, base, llm, probs, art.classes, threshold)
             llm_note = {
                 "category": llm.issues[0].category,
                 "language": llm.language,
@@ -380,10 +449,12 @@ def understand(row: ComplaintRow, mode: Mode, emit: Emit) -> Understanding:
                 "classifier_top3": _top3(probs, art.classes),
                 "tau": round(threshold, 4),
                 "oof_probabilities": held_out,
+                "extract_mode": config.extract_mode(),
                 "llm_reason": llm_reason,
                 "llm_used": result.source == "llm",
                 "llm_called": llm_called,
                 "llm": llm_note,
+                "category_disagreement": disagreement,
                 "degraded": llm_reason is not None and not llm_called,
                 "clues": result.issues[0].model_dump(mode="json"),
                 "language": result.language,

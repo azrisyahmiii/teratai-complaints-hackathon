@@ -368,7 +368,7 @@ def _party_mismatch(t: Txn, issue: Issue, text: str) -> bool:
     if issue.category == "FEE_DISPUTE":
         return False  # a fee has no payee: it is matched on fee type + month
     party = _named_party(issue, text)
-    return bool(party) and party_similarity(t.merchant, party) < config.PARTY_VETO_RATIO
+    return party is not None and party_similarity(t.merchant, party) < config.PARTY_VETO_RATIO
 
 
 def _fee_fits(t: Txn, issue: Issue, window: DateWindow, text: str) -> bool:
@@ -423,6 +423,62 @@ def _validate_investigator(txn_id: str, row: ComplaintRow, issue: Issue, window:
     return not _party_mismatch(t, issue, text)
 
 
+def _candidates(
+    row: ComplaintRow, issue: Issue, window: DateWindow, text: str
+) -> tuple[list[Candidate], dict[str, Txn | None]]:
+    """Scored candidates, best first, and the earlier identical charge of each duplicate candidate."""
+    siblings: dict[str, Txn | None] = {}
+    if issue.category == "FEE_DISPUTE":
+        cands = _fee_candidates(row, issue, window, text)
+    elif issue.category == "DUPLICATE_CHARGE":
+        siblings = _duplicate_candidates(row, issue, window)
+        cands = [_score(data.txn(tid), issue, window, text) for tid in siblings]
+    else:
+        surv = _survivors(row, issue, window)
+        if not surv and _is_round(issue):
+            # The customer gave a round figure ("600 ringgit" for RM577.87) with no "about": retry at the rounding
+            # tolerance. These candidates carry `amount_rounded`, which is NOT a discriminating signal, so one of
+            # them wins only on a payee name or card digits, never on its rounded amount alone.
+            relaxed = issue.model_copy(update={"amount_approx": True})
+            cands = []
+            for t in _survivors(row, relaxed, window):
+                c = _score(t, relaxed, window, text)
+                b = {("amount_rounded" if k == "amount_approx" else k): v for k, v in c.breakdown.items()}
+                cands.append(Candidate(txn_id=c.txn_id, score=c.score, breakdown=b))
+        else:
+            cands = [_score(t, issue, window, text) for t in surv]
+    return _rank(cands), siblings
+
+
+def _is_round(issue: Issue) -> bool:
+    """A whole amount of at least RM100 that is a multiple of 50: a figure people round to."""
+    a = issue.amount
+    return (
+        a is not None
+        and not issue.amount_approx
+        and a >= 100
+        and a == a.to_integral_value()
+        and int(a) % 50 == 0
+        and issue.category in ("FAILED_TRANSFER", "SCAM_TRANSFER", "UNAUTHORISED_CARD", "ATM_NOT_DISPENSED")
+    )
+
+
+def probe_unique(row: ComplaintRow, issue: Issue, window: DateWindow) -> str | None:
+    """The txn id the matcher would pick for `issue` without the investigator, or None (none / ambiguous / vetoed).
+
+    Used to settle a category disagreement (SPEC section 4.2 step 3, evidence consistency): the category under which
+    the complaint's clues single out one transaction is the better reading. Pure, no events.
+    """
+    if issue.category == "SERVICE_QUALITY":
+        return None
+    text = f"{row.subject} {row.text}"
+    cands, _ = _candidates(row, issue, window, text)
+    status, txn_id = _decide(cands)
+    if status != "UNIQUE" or txn_id is None or _party_mismatch(data.txn(txn_id), issue, text):
+        return None
+    return txn_id
+
+
 def _run(row: ComplaintRow, u: Understanding, window: DateWindow, emit: Emit) -> tuple[MatchResult, str | None]:
     """The match, and the reason (if any) it was held back from UNIQUE for the trace."""
     issue = u.issues[0]
@@ -445,15 +501,7 @@ def _run(row: ComplaintRow, u: Understanding, window: DateWindow, emit: Emit) ->
     ):
         return result("WRONG_CUSTOMER", None, [], {}), "card_not_owned"
 
-    siblings: dict[str, Txn | None] = {}
-    if issue.category == "FEE_DISPUTE":
-        cands = _fee_candidates(row, issue, window, text)
-    elif issue.category == "DUPLICATE_CHARGE":
-        siblings = _duplicate_candidates(row, issue, window)
-        cands = [_score(data.txn(tid), issue, window, text) for tid in siblings]
-    else:
-        cands = [_score(t, issue, window, text) for t in _survivors(row, issue, window)]
-    cands = _rank(cands)
+    cands, siblings = _candidates(row, issue, window, text)
     status, txn_id = _decide(cands)
     reason: str | None = None
     if status == "UNIQUE" and txn_id and _party_mismatch(data.txn(txn_id), issue, text):

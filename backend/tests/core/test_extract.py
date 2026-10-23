@@ -51,6 +51,12 @@ def _noop(_e: StageEvent) -> None:
     return None
 
 
+@pytest.fixture(autouse=True)
+def _llm_first(monkeypatch: pytest.MonkeyPatch) -> None:
+    """These tests exercise the LLM-first path (conftest turns it off for everything else)."""
+    monkeypatch.setenv("EXTRACT_MODE", "llm")
+
+
 @pytest.fixture
 def replay(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """DEMO_MODE=cached with a fresh cache holding the recorded Haiku answers. Never touches var/ or the network."""
@@ -110,15 +116,28 @@ def test_demo_rows_live_mode_keep_gold_category_amount_language(replay: None, ci
     assert called[0].tokens_in > 0
 
 
-def test_confident_classifier_keeps_its_label_and_source(replay: None) -> None:
-    u, _ = _understand(data.complaint("CMP-00165"))
-    assert u.source == "classifier"  # LLM only enriched the clues
+def test_agreeing_readers_are_accepted_and_the_llm_is_primary(replay: None) -> None:
+    u, events = _understand(data.complaint("CMP-00165"))
+    assert u.source == "llm"  # LLM primary, the classifier confirmed it
+    stage = next(e for e in events if e.stage == "understand")
+    assert stage.payload["category_disagreement"] is None
+    assert "agree" in stage.payload["decision"]
 
 
-def test_batch_mode_does_not_call_the_llm_for_a_confident_row(replay: None) -> None:
+def test_batch_mode_calls_the_llm_on_every_row(replay: None) -> None:
     _, events = _understand(data.complaint("CMP-00165"), mode="batch")
-    assert [e.stage for e in events] == ["understand"]
-    assert events[0].payload["llm_called"] is False
+    assert [e.stage for e in events] == ["extract", "understand"]
+    assert events[1].payload["llm_called"] is True
+    assert events[1].payload["llm_reason"] == "llm_first"
+
+
+def test_regex_mode_never_calls_the_llm(replay: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("EXTRACT_MODE", "regex")
+    for mode in ("live", "batch"):
+        u, events = _understand(data.complaint("CMP-00165"), mode=mode)
+        assert [e.stage for e in events] == ["understand"]
+        assert events[0].payload["llm_called"] is False and events[0].payload["degraded"] is False
+        assert u.source == "classifier"
 
 
 # --- novel, low-confidence row ---------------------------------------------------------------------------------
@@ -127,13 +146,13 @@ def test_batch_mode_does_not_call_the_llm_for_a_confident_row(replay: None) -> N
 def test_novel_low_confidence_row_gets_llm_category_and_clues(replay: None) -> None:
     u, events = _understand(NOVEL, mode="batch")
     stage = next(e for e in events if e.stage == "understand")
-    assert stage.payload["llm_reason"] == "low_confidence"
+    assert stage.payload["llm_reason"] == "llm_first"
     assert u.source == "llm"
     issue = u.issues[0]
     assert issue.category == "FAILED_TRANSFER"
     assert issue.counterparty == "Nur Izzati"
     assert issue.date_phrase == "21 September"
-    assert "LLM label" in stage.payload["decision"]
+    assert "LLM" in stage.payload["decision"]
 
 
 # --- prompt injection ------------------------------------------------------------------------------------------

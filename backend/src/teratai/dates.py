@@ -260,6 +260,37 @@ def _scan(text: str, received: date) -> tuple[str, _Span] | None:
     return None if best is None else (best[1], best[2])
 
 
+_NUMBER_WORDS: dict[str, int] = {
+    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+    "satu": 1, "dua": 2, "tiga": 3, "empat": 4, "lima": 5, "enam": 6, "tujuh": 7, "lapan": 8, "sembilan": 9,
+    "sepuluh": 10,
+}  # fmt: skip
+
+
+def phrase_supported(canonical: str, text: str) -> bool:
+    """A canonical date form (the model's closed vocabulary) is backed by the text.
+
+    Every weekday, month and number it names must occur in the text in some surface form (English or Malay name,
+    short form, "11/7", a number word). Relative words with none of these ("yesterday") are backed by nothing more
+    than the caller's check that the customer's own words exist in the text.
+    """
+    canon = canonical.lower()
+    norm = normalise(text).lower()
+    toks = re.findall(r"[^\W_]+", norm)
+    want_wd = {_WEEKDAYS[t] for t in re.findall(r"[^\W\d_]+", canon) if t in _WEEKDAYS}
+    have_wd = {_WEEKDAYS[t] for t in toks if t in _WEEKDAYS}
+    if not want_wd <= have_wd:
+        return False
+    want_mon = {_MONTHS[t] for t in re.findall(r"[^\W\d_]+", canon) if t in _MONTHS}
+    have_mon = {_MONTHS[t] for t in toks if t in _MONTHS}
+    have_mon |= {int(m) for m in re.findall(r"\b\d{1,2}\s?[/.-]\s?(\d{1,2})\b", norm)}
+    if not want_mon <= have_mon:
+        return False
+    nums = set(re.findall(r"\d+", norm)) | {str(_NUMBER_WORDS[t]) for t in toks if t in _NUMBER_WORDS}
+    nums |= {n.lstrip("0") for n in nums}
+    return all(n.lstrip("0") in nums for n in re.findall(r"\d+", canon))
+
+
 def find_date_phrase(text: str) -> str | None:
     """First recognised date phrase in free text (EN + MS), or None.
 

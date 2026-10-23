@@ -8,11 +8,13 @@ both, if it is a call-centre note written by staff, or if it is neither (e.g. Ch
 lists work for complaints and for generated replies). C7's self-check reuses `detect` / `dominant` on replies.
 """
 
+import hashlib
 import re
 from typing import Literal
 
-from teratai import data
+from teratai import config, data
 from teratai.models import ComplaintRow, Lang
+from teratai.textnorm import normalise
 
 Detected = Literal["EN", "MS", "MIXED", "OTHER"]
 
@@ -34,6 +36,9 @@ MS_WORDS = frozenset(
 # --- thresholds (tuned against `reply_language` in labels_train.csv; see tests) -------------------------------
 MIN_HITS = 2  # fewer stopword hits than this in total -> not enough evidence, MIXED
 MINORITY_SHARE = 0.05  # a language is "present" when it holds at least this share of the stopword hits
+PARTICLES = frozenset(["lah", "kah", "je", "ni", "ya", "pun"])  # discourse particles: no language evidence
+TIE_BREAK_RATIO = 3  # the model's language must hold this many times the other's function-word hits
+SHORT_TEXT_WORDS = 25  # the model's language_guess breaks a MIXED tie only below this many words
 NON_LATIN_SHARE = 0.30  # share of non-Latin letters above which the text is OTHER
 
 _TOKEN = re.compile(r"[^\W\d_]+", re.UNICODE)
@@ -71,14 +76,58 @@ def dominant(text: str) -> Lang:
     return "MS" if ms > en else "EN"
 
 
-def reply_language(row: ComplaintRow) -> tuple[Lang, str]:
-    """The language to reply in, with the reason shown in the trace."""
+# The model's EN / MS reading of a short mixed complaint, remembered per complaint text so the reply stage (which asks
+# `reply_language(row)` again) answers the same language the understand stage reported.
+_GUESSES: dict[str, str] = {}
+
+
+def complaint_counts(text: str) -> tuple[int, int]:
+    """(EN, MS) function-word hits of a complaint, read through the clue-only normaliser. Discourse particles
+    ("lah", "je") are Malay-looking but say nothing about the language of the sentence ("refund pls lah")."""
+    toks = _tokens(normalise(text))
+    return sum(t in EN_WORDS for t in toks), sum(t in MS_WORDS and t not in PARTICLES for t in toks)
+
+
+def detect_complaint(text: str) -> Detected:
+    """`detect` for a customer's complaint (robustness review 5.1.6): SMS short forms are read through the clue-only
+    normaliser and particles do not count. The 5% minority share stays: the training labels call a Malay sentence
+    with a single English function word MIXED (9 labels break if one stray word is ignored)."""
+    letters = [c for c in text if c.isalpha()]
+    if letters and sum(ord(c) > 0x24F for c in letters) / len(letters) >= NON_LATIN_SHARE:
+        return "OTHER"
+    en, ms = complaint_counts(text)
+    if en + ms < MIN_HITS:
+        return "MIXED"
+    ms_share = ms / (en + ms)
+    if ms_share <= MINORITY_SHARE:
+        return "EN"
+    if ms_share >= 1 - MINORITY_SHARE:
+        return "MS"
+    return "MIXED"
+
+
+def reply_language(row: ComplaintRow, guess: str | None = None) -> tuple[Lang, str]:
+    """The language to reply in, with the reason shown in the trace.
+
+    `guess` is the LLM's language_guess. It breaks a tie only: a short, non-staff text the code calls MIXED where the
+    model says EN or MS clearly. Staff notes and long mixed texts keep the policy rule (preferred_language).
+    """
     pref: Lang = "MS" if data.customer(row.customer_id).preferred_language == "MS" else "EN"
     if row.channel == "Call centre note":
         return pref, f"call-centre note written by staff -> preferred_language {pref}"
-    found = detect(f"{row.subject} {row.text}")
-    en, ms, _ = counts(f"{row.subject} {row.text}")
+    text = f"{row.subject} {row.text}"
+    key = hashlib.sha1(f"{row.customer_id}|{row.received_at}|{text}".encode()).hexdigest()
+    if guess is None:
+        guess = _GUESSES.get(key)  # the reply stage asks again without the model's answer: same complaint, same reading
+    found = detect_complaint(text)
+    en, ms = complaint_counts(text)
     stats = f"EN {en} / MS {ms} stopword hits"
     if found == "EN" or found == "MS":
         return found, f"written in {found} ({stats})"
+    lopsided = guess in ("EN", "MS") and (en if guess == "EN" else ms) >= TIE_BREAK_RATIO * (ms if guess == "EN" else en)
+    if config.LANG_LLM_TIEBREAK and found == "MIXED" and lopsided and len(_tokens(text)) < SHORT_TEXT_WORDS:
+        if len(_GUESSES) > 20000:
+            _GUESSES.clear()
+        _GUESSES[key] = guess  # type: ignore[assignment]
+        return guess, f"short mixed text ({stats}); model reads it as {guess}"  # type: ignore[return-value]
     return pref, f"{found.lower()} language ({stats}) -> preferred_language {pref}"

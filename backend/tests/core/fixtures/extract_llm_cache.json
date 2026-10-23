@@ -1,235 +1,249 @@
 [
  {
-  "key": "3d3d53649cce21897af1d943cab3d7fe3b6d1fe0bc6e172acd6cdb17808d5d78",
+  "key": "a094d8cedb75958fe0b4b767f8354ef2be182ffd2172126ad1ea95b33752e1cc",
   "response": {
    "content": [
     {
-     "id": "toolu_011S6BNuxDH4NFUbtu4LC993",
+     "id": "toolu_01RpgFKbLk51ChL79eR51iSq",
      "input": {
       "injection_suspected": false,
       "is_complaint": true,
       "issues": [
        {
-        "amount": 46.66,
         "amount_approx": false,
+        "amount_text": "RM46.66",
+        "amount_value": 46.66,
         "card_in_possession": null,
         "card_last4": null,
         "category": "DUPLICATE_CHARGE",
         "counterparty": "GoRide",
         "date_phrase": "hari Selasa lepas",
-        "fee_month": null,
-        "fee_type": null
+        "date_phrase_normalised": "last tuesday",
+        "other_amounts": []
        }
       ],
-      "language": "MS"
+      "language_guess": "MS"
      },
      "name": "record_clues",
      "type": "tool_use"
     }
    ],
-   "latency_ms": 1957,
+   "latency_ms": 1631,
    "model": "claude-haiku-5-5",
    "stop_reason": "tool_use",
    "usage": {
-    "cache_read_tokens": 1655,
+    "cache_read_tokens": 2717,
     "cache_write_tokens": 0,
     "input_tokens": 292,
-    "output_tokens": 208
+    "output_tokens": 237
    }
   }
  },
  {
-  "key": "b14de7532109d6a02413517effe6227b1d88ff313606d2e530a77c9889af479f",
+  "key": "f24b7d963ea146c0ff85615af83f171f8e9ba03c550f2b00cb0ccb05b4af94c0",
   "response": {
    "content": [
     {
-     "id": "toolu_01RHF4kKFHusGpA6aEGsdeUV",
+     "id": "toolu_01SrcTQgpAWQR5vwqq9Zna2r",
      "input": {
       "injection_suspected": false,
       "is_complaint": true,
       "issues": [
        {
-        "amount": 1500,
         "amount_approx": true,
+        "amount_text": "RM1,500",
+        "amount_value": 1500,
         "card_in_possession": null,
         "card_last4": null,
         "category": "ATM_NOT_DISPENSED",
         "counterparty": null,
         "date_phrase": "last Friday",
+        "date_phrase_normalised": "last friday",
         "fee_month": null,
-        "fee_type": null
+        "fee_type": null,
+        "other_amounts": []
        }
       ],
-      "language": "EN"
+      "language_guess": "EN"
      },
      "name": "record_clues",
      "type": "tool_use"
     }
    ],
-   "latency_ms": 1744,
+   "latency_ms": 1347,
    "model": "claude-haiku-5-5",
    "stop_reason": "tool_use",
    "usage": {
-    "cache_read_tokens": 1655,
+    "cache_read_tokens": 2717,
     "cache_write_tokens": 0,
     "input_tokens": 292,
-    "output_tokens": 199
+    "output_tokens": 242
    }
   }
  },
  {
-  "key": "890d6ce2b119755762e22c0f91203cf00c2638d46fa7586c99c8ca352f42d792",
+  "key": "949514ae5b7cc4b2504d6187a5e4a9d795d2a9a9927d4c6cae4eae2e0bbdf08d",
   "response": {
    "content": [
     {
-     "id": "toolu_01KGfRwb6nwPpZCaXZWNHeAN",
+     "id": "toolu_01Rj27aXUt8vcfswWN7k2EYR",
      "input": {
       "injection_suspected": false,
       "is_complaint": true,
       "issues": [
        {
-        "amount": 2200,
         "amount_approx": true,
+        "amount_text": "RM2,200",
+        "amount_value": 2200,
         "card_in_possession": true,
         "card_last4": null,
         "category": "UNAUTHORISED_CARD",
         "counterparty": "LUXEGOODS LONDON",
         "date_phrase": "last Saturday",
-        "fee_month": null,
-        "fee_type": null
+        "date_phrase_normalised": "last saturday",
+        "other_amounts": []
        }
       ],
-      "language": "EN"
+      "language_guess": "EN"
      },
      "name": "record_clues",
      "type": "tool_use"
     }
    ],
-   "latency_ms": 1705,
+   "latency_ms": 1396,
    "model": "claude-haiku-5-5",
    "stop_reason": "tool_use",
    "usage": {
-    "cache_read_tokens": 1655,
+    "cache_read_tokens": 2717,
     "cache_write_tokens": 0,
     "input_tokens": 280,
-    "output_tokens": 211
+    "output_tokens": 239
    }
   }
  },
  {
-  "key": "94c54618d5b931f7b2890ff696014e1b4653530b3f0eaeaf7806df229a66dcc0",
+  "key": "4c9024025f19aaacfe1166c78cd0cc712ad49b8f081a9a388c0b42d0c702f610",
   "response": {
    "content": [
     {
-     "id": "toolu_01HNzh5t2HmrBgPMygLnEEkv",
+     "id": "toolu_014dxm4cDbDYXNZix1UdBNES",
      "input": {
       "injection_suspected": false,
       "is_complaint": true,
       "issues": [
        {
-        "amount": 4687.1,
         "amount_approx": false,
+        "amount_text": "RM 4,687.10",
+        "amount_value": 4687.1,
         "card_in_possession": null,
         "card_last4": null,
         "category": "FAILED_TRANSFER",
         "counterparty": "Aina",
         "date_phrase": "last Friday",
+        "date_phrase_normalised": "last friday",
         "fee_month": null,
-        "fee_type": null
+        "fee_type": null,
+        "other_amounts": []
        }
       ],
-      "language": "EN"
+      "language_guess": "EN"
      },
      "name": "record_clues",
      "type": "tool_use"
     }
    ],
-   "latency_ms": 1632,
+   "latency_ms": 4749,
    "model": "claude-haiku-5-5",
    "stop_reason": "tool_use",
    "usage": {
-    "cache_read_tokens": 1655,
+    "cache_read_tokens": 2717,
     "cache_write_tokens": 0,
     "input_tokens": 284,
-    "output_tokens": 201
+    "output_tokens": 247
    }
   }
  },
  {
-  "key": "b8d5823dab1ef03a175c0add0db3fd91ebe233a058a5383dd0077dd243550821",
+  "key": "fc0f96a5d77686a460975b17bbcf185b0a7666a21292a7f1dc08a5ad4d900f7f",
   "response": {
    "content": [
     {
-     "id": "toolu_01BqPFxyFiTwiF9HZJRfq1CM",
+     "id": "toolu_01NBDgBtsFJVvH118bLnYq6d",
      "input": {
       "injection_suspected": false,
       "is_complaint": true,
       "issues": [
        {
-        "amount": null,
         "amount_approx": false,
+        "amount_text": null,
+        "amount_value": null,
         "card_in_possession": null,
         "card_last4": null,
         "category": "FAILED_TRANSFER",
         "counterparty": "Nur Izzati",
         "date_phrase": "21 September",
+        "date_phrase_normalised": "21 september",
         "fee_month": null,
-        "fee_type": null
+        "fee_type": null,
+        "other_amounts": []
        }
       ],
-      "language": "EN"
+      "language_guess": "EN"
      },
      "name": "record_clues",
      "type": "tool_use"
     }
    ],
-   "latency_ms": 1454,
+   "latency_ms": 1318,
    "model": "claude-haiku-5-5",
    "stop_reason": "tool_use",
    "usage": {
-    "cache_read_tokens": 1655,
+    "cache_read_tokens": 2717,
     "cache_write_tokens": 0,
     "input_tokens": 257,
-    "output_tokens": 200
+    "output_tokens": 238
    }
   }
  },
  {
-  "key": "510b82f73b6620fc1db2ebf1c466080dceec48a8cbc1d46388c8ce0e4f9f8acd",
+  "key": "7d71032501ab90396c830ca775026b38510c9e1c3c0bc241526fadd606953c7b",
   "response": {
    "content": [
     {
-     "id": "toolu_011eC5dceNTHg3V5Ee6F9b32",
+     "id": "toolu_01GkDu8EkcCBUATNXhKKipUb",
      "input": {
       "injection_suspected": true,
       "is_complaint": true,
       "issues": [
        {
-        "amount": null,
         "amount_approx": false,
+        "amount_text": null,
+        "amount_value": null,
         "card_in_possession": null,
         "card_last4": null,
         "category": "DUPLICATE_CHARGE",
         "counterparty": "GoRide",
         "date_phrase": "last Tuesday",
+        "date_phrase_normalised": "last tuesday",
         "fee_month": null,
-        "fee_type": null
+        "fee_type": null,
+        "other_amounts": []
        }
       ],
-      "language": "EN"
+      "language_guess": "EN"
      },
      "name": "record_clues",
      "type": "tool_use"
     }
    ],
-   "latency_ms": 1720,
+   "latency_ms": 1548,
    "model": "claude-haiku-5-5",
    "stop_reason": "tool_use",
    "usage": {
-    "cache_read_tokens": 1655,
+    "cache_read_tokens": 2717,
     "cache_write_tokens": 0,
     "input_tokens": 272,
-    "output_tokens": 202
+    "output_tokens": 242
    }
   }
  }
