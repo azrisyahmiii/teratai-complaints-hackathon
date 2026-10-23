@@ -31,7 +31,10 @@ def test_staff_requires_session(client: TestClient) -> None:
     assert client.get("/api/export/predictions?run_id=live").status_code == 401
 
 
-@pytest.mark.parametrize("username,role", [("asyraf", "manager"), ("leon", "officer"), ("azri", "fraud")])
+@pytest.mark.parametrize("username,role", [
+    ("asyraf", "manager"), ("leon", "officer"), ("azri", "fraud"),
+    ("vincent", "officer"), ("nishan", "fraud"),
+])
 def test_login_identity_and_logout(client: TestClient, username: str, role: str) -> None:
     r = client.post("/api/auth/login", json={"username": username, "password": "wrong"}, headers=HEADERS)
     assert r.status_code == 401
@@ -54,6 +57,8 @@ def test_login_identity_and_logout(client: TestClient, username: str, role: str)
 @pytest.mark.parametrize("username,allowed,denied", [
     ("leon", {"CMP-00244", "CMP-00165", "CMP-00289"}, "CMP-00387"),
     ("azri", {"CMP-00387"}, "CMP-00244"),
+    ("vincent", {"CMP-00244", "CMP-00165", "CMP-00289"}, "CMP-00387"),
+    ("nishan", {"CMP-00387"}, "CMP-00244"),
     ("asyraf", {"CMP-00244", "CMP-00165", "CMP-00387", "CMP-00289"}, None),
 ])
 def test_rows_details_checks_and_outbox_scoped(client: TestClient, username: str, allowed: set[str], denied: str | None) -> None:

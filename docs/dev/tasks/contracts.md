@@ -1,5 +1,10 @@
 # Contracts (frozen after P4a)
 
+> **Current ownership override:** [CURRENT-WORK.md](CURRENT-WORK.md) assigns exclusive files to
+> Azri (workflow), Leon (insights) and Asyraf (integration/SLA). Its ownership and handoff rules
+> supersede section 4 and the old joint-edit instructions for the remaining work. Preserve the
+> organiser API and current generated schemas; historical shapes below are not instructions to revert them.
+
 Owned by both devs. Change it (and `models.py`) only through a proposal in a report, then a joint commit on `main`
 titled `contracts: …`, after which both devs merge `main`. Paths are real: the package is `backend/src/teratai/`
 (SPEC §14 shows it without `src/`). Commands run from `backend/` or `web/` unless they say otherwise.

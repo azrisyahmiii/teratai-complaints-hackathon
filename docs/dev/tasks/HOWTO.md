@@ -1,5 +1,8 @@
 # HOWTO: two devs, two laptops, one Claude Code session each
 
+> **Current team allocation:** use [CURRENT-WORK.md](CURRENT-WORK.md) for Azri, Leon and Asyraf.
+> It supersedes this historical two-dev workflow and its ownership/branch instructions for new work.
+
 Read in this order: [contracts.md](contracts.md) (shared models, file ownership, ports), then your own task file:
 [core.md](core.md) (Dev A) or [platform.md](platform.md) (Dev B). Each dev has one lead session that plans and merges, and
 **builder** subagents that each build one task in an isolated git worktree. A **reviewer** checks every wave.

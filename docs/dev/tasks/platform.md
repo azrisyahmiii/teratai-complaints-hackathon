@@ -1,5 +1,9 @@
 # Platform tasks (Dev B, integrator, branch `feat/platform`)
 
+> **Reassigned:** [CURRENT-WORK.md](CURRENT-WORK.md) is the current allocation. Azri owns logs,
+> fraud workflow and escalation; Leon owns insights; Asyraf owns integration/SLA and shared wiring.
+> The rows below remain a requirements backlog, not authority to edit another person's files.
+
 Owns the live round: intake → async pipeline → write-back → queues → UI, plus all merges. B is the sole owner of the
 `web/` structure, layout, shared components and generated API types. File globs are in [contracts.md §4](contracts.md).
 Read SPEC §3, §4.1, §4.8, §7–§11, §13 and DEMO.md before starting.

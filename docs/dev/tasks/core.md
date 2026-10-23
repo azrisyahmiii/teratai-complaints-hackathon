@@ -1,5 +1,9 @@
 # Core tasks (Dev A, branch `feat/core`)
 
+> **Current allocation:** see [CURRENT-WORK.md](CURRENT-WORK.md). Core C20 and final predictions
+> are already on `main`; the remaining fraud workbench belongs to Azri. Do not duplicate that
+> work or regenerate the submission while implementing insights/integration.
+
 > **Dev B / integrator: start with [core-handoff.md](core-handoff.md).** It covers what this branch contains, how to
 > merge it, and what Platform builds next.
 
