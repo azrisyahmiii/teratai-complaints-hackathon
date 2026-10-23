@@ -4,6 +4,8 @@ const nextConfig: NextConfig = {
   /* config options here */
   cacheComponents: true,
   partialPrefetching: true,
+  // The round dev badge sits over the sidebar's role switcher during demos.
+  devIndicators: false,
   async rewrites() {
     const apiUrl = process.env.API_URL ?? "http://localhost:8000";
     return [

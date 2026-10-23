@@ -11,3 +11,6 @@ shots/
 
 # runtime files: sqlite DBs, llm cache, classifier
 backend/var/
+
+# builder subagent worktrees
+.claude/worktrees/

@@ -129,7 +129,7 @@ export function EvidencePanel({ detail }: { detail: CaseDetail }) {
           <Table className="text-[13px]">
             <TableHeader>
               <TableRow className="hover:bg-muted">
-                {["", "Transaction", "Date", "Merchant", "Channel", "Amount", "Status"].map((h, i) => (
+                {["", "Transaction", "Merchant", "Amount", "Status"].map((h, i) => (
                   <TableHead
                     key={i}
                     className={cn("h-9 bg-muted px-2 text-xs font-medium text-muted-foreground", h === "Amount" && "text-right")}
@@ -151,12 +151,15 @@ export function EvidencePanel({ detail }: { detail: CaseDetail }) {
                       {ROLE_LABEL[r.role] ?? r.role}
                       {quiet && r.score != null && <span className="block text-muted-foreground">score {r.score}</span>}
                     </TableCell>
-                    <TableCell className="px-2 py-0">
+                    {/* Two lines per cell keep Amount and Status visible in the narrow left column. */}
+                    <TableCell className="px-2 py-1.5">
                       <MonoId>{r.txn_id}</MonoId>
+                      <span className="block text-xs text-muted-foreground">{formatDateTimeShort(r.txn_time)}</span>
                     </TableCell>
-                    <TableCell className="px-2 py-0">{formatDateTimeShort(r.txn_time)}</TableCell>
-                    <TableCell className="whitespace-normal px-2 py-1">{r.merchant || "—"}</TableCell>
-                    <TableCell className="whitespace-normal px-2 py-1">{r.channel}</TableCell>
+                    <TableCell className="whitespace-normal px-2 py-1.5">
+                      {r.merchant || "—"}
+                      <span className="block text-xs text-muted-foreground">{r.channel}</span>
+                    </TableCell>
                     <TableCell className="px-2 py-0"><Money value={r.amount_myr} /></TableCell>
                     <TableCell className="px-2 py-0">{r.status}</TableCell>
                   </TableRow>
