@@ -115,6 +115,10 @@ The organisers' laptop calls your API right after the 15:00 freeze (the hidden t
 - run it on your laptop on the venue Wi-Fi, listening on all interfaces (for example `uvicorn app:app --host 0.0.0.0 --port 8000`), and give us `http://<your-laptop-ip>:8000`; or
 - put it behind a tunnel (ngrok, Cloudflare Tunnel) and give us that URL.
 
+Two things trip teams up:
+- **Windows Firewall.** The first time your API starts, Windows asks whether to allow Python (or Node, etc.) on the network: tick **Private networks** and allow it. If you dismissed the prompt, add a rule for your port in an admin terminal (`netsh advfirewall firewall add rule name="hackathon api" dir=in action=allow protocol=TCP localport=8000`) or use a tunnel. macOS asks the same once; allow it.
+- **Test from another laptop**, not your own: a teammate runs `python scoring/api_check.py http://<your-laptop-ip>:8000`. `localhost` working proves nothing about the network.
+
 We check that we can reach you at Checkpoint 2 on Day 2. Keep API keys for your LLM on your side; our calls carry no credentials.
 
 ## What the organisers' test checks
