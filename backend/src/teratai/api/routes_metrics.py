@@ -1,13 +1,17 @@
 """Read-only, role-scoped insights over stored cases and agent events (docs/dev/tasks/leon-insights.md)."""
 
+import json
 from datetime import date, datetime
-from typing import Literal
+from decimal import Decimal
+from typing import Literal, get_args
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from teratai import db
+from teratai import db, settings
+from teratai.api import auth
 from teratai.api.auth import User
+from teratai.models import Category, Channel
 
 router = APIRouter(prefix="/api")
 
@@ -164,4 +168,41 @@ def get_metrics(
     category: str | None = None,
     channel: str | None = None,
 ) -> MetricsOut:
-    raise HTTPException(501, detail="metrics not implemented yet")
+    from teratai.ops import metrics  # deferred: ops.metrics imports the models above
+
+    auth.require_run(user, run_id)
+    if category is not None and category not in get_args(Category):
+        raise HTTPException(422, detail=f"unknown category {category!r}")
+    if channel is not None and channel not in get_args(Channel):
+        raise HTTPException(422, detail=f"unknown channel {channel!r}")
+    if date_from and date_to and date_from > date_to:
+        raise HTTPException(422, detail="date_from must not be after date_to")
+    clause, params = auth.case_scope(user)
+    with db.connect() as con:
+        case_rows = con.execute(f"SELECT c.* FROM cases c WHERE c.run_id=? AND ({clause})", (run_id, *params)).fetchall()
+        event_rows = con.execute(
+            "SELECT e.* FROM case_events e JOIN cases c ON c.run_id=e.run_id AND c.complaint_id=e.complaint_id "
+            f"WHERE c.run_id=? AND ({clause})", (run_id, *params),
+        ).fetchall()
+    cases = [
+        metrics.CaseRecord(
+            complaint_id=r["complaint_id"], status=r["status"],
+            received_at=datetime.fromisoformat(json.loads(r["row"])["received_at"]),
+            channel=json.loads(r["row"])["channel"],
+            created_at=datetime.fromisoformat(r["created_at"]) if r["created_at"] else None,
+            case_state=r["case_state"], sent=bool(r["sent"]),
+            human_action=json.loads(r["human_action"]) if r["human_action"] else None,
+            decision=json.loads(r["agent_decision"]) if r["status"] == "done" and r["agent_decision"] else None,
+        )
+        for r in case_rows
+    ]
+    events = [
+        metrics.EventRecord(
+            complaint_id=e["complaint_id"], actor=e["actor"], stage=e["stage"], model=e["model"],
+            tokens_in=e["tokens_in"] or 0, tokens_out=e["tokens_out"] or 0,
+            cost_usd=Decimal(e["cost_usd"] or "0"), latency_ms=e["latency_ms"] or 0, action=e["action"],
+        )
+        for e in event_rows
+    ]
+    filters = MetricFilters(date_from=date_from, date_to=date_to, category=category, channel=channel)
+    return metrics.compute(user.role, run_id, cases, events, settings.sim_now(), filters)
