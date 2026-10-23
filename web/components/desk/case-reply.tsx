@@ -13,6 +13,7 @@ import { api } from "@/lib/api/client"
 import { detailLines, replySourceLine, segmentReply, str, type CaseDetail, type CheckIssue, type TokenVerdict } from "@/lib/case"
 import { formatDateTime, formatMoney } from "@/lib/format"
 import { useRole } from "@/lib/role"
+import { errorLines, workflow, type OpsExtra } from "@/lib/workflow"
 import { cn } from "cn"
 
 /** Reply text with each checked ID and amount underlined: verified in success colour, unverified in critical. */
@@ -47,7 +48,7 @@ interface Check {
   failed?: boolean
 }
 
-type Confirm = "approve" | "edit_approve" | "reject" | null
+type Confirm = "approve" | "edit_approve" | "reject" | "escalate" | null
 
 const DEBOUNCE_MS = 300
 
@@ -92,7 +93,7 @@ export function ReplyPanel({
   onChanged: () => Promise<void>
   onEditingChange: (editing: boolean) => void
 }) {
-  const { defaultName } = useRole()
+  const { defaultName, user } = useRole()
   const id = detail.case.complaint_id
   const [editing, setEditingRaw] = useState(false)
   const [draft, setDraft] = useState("")
@@ -103,6 +104,19 @@ export function ReplyPanel({
   const [errors, setErrors] = useState<string[]>([])
 
   const actor = defaultName
+  const [ops, setOps] = useState<OpsExtra | null>(null)
+  const caseState = detail.case.case_state
+  useEffect(() => {
+    let alive = true
+    workflow
+      .opsCase(id)
+      .then((r) => alive && setOps(r.ops))
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [id, caseState])
+  const escalated = ops?.ops_state === "escalated"
   const awaiting = detail.case.case_state === "awaiting_approval" && detail.can_act
   const caseFlagged = detail.case.self_check === "flagged"
   const customer = detail.case.customer_name
@@ -198,9 +212,37 @@ export function ReplyPanel({
     }
   }
 
+  const limit = user.approval_limit_myr
+  const overLimit =
+    user.role === "officer" &&
+    (ops?.over_my_limit === true || (limit !== null && !!refund && Number(refund) > Number(limit)))
+
+  async function escalate() {
+    setBusy(true)
+    setErrors([])
+    try {
+      await workflow.escalate(id, reason.trim())
+      setOps((o) => (o ? { ...o, ops_state: "escalated", escalated_by: actor, escalation_reason: reason.trim() } : o))
+      setConfirm(null)
+      setReason("")
+      await onChanged()
+    } catch (e) {
+      setConfirm(null)
+      setErrors(errorLines(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const money = refund && refund !== "0.00" ? formatMoney(refund) : null
   const confirmCopy =
-    confirm === "reject"
+    confirm === "escalate"
+      ? {
+          title: "Escalate to manager?",
+          body: `Nothing is sent to ${customer}. A manager decides and sees your reason.`,
+          go: "Escalate to manager",
+        }
+      : confirm === "reject"
       ? {
           title: "Reject this case?",
           body: `No reply is sent to ${customer}. You'll be recorded as the reviewer.`,
@@ -265,13 +307,30 @@ export function ReplyPanel({
       </div>
 
       <div className="flex flex-col gap-3 border-t p-4">
-        {detail.case.case_state === "awaiting_approval" && !detail.can_act && (
+        {detail.case.case_state === "awaiting_approval" && !detail.can_act && !escalated && (
           <p className="rounded-md border border-status-warning-border bg-status-warning-bg p-3 text-[13px] text-status-warning-fg">
             {detail.action_block_reason ?? "This case is awaiting an authorised reviewer."}
           </p>
         )}
+        {/* Over the officer's limit the backend blocks approval (can_act false); escalating is the officer's action. */}
+        {detail.case.case_state === "awaiting_approval" && !detail.can_act && overLimit && !escalated && (
+          <>
+            {errors.length > 0 && <Critical lines={errors} />}
+            <div>
+              <Button disabled={busy || !actor} onClick={() => setConfirm("escalate")}>
+                Escalate to manager
+              </Button>
+            </div>
+          </>
+        )}
         {closed && <p className="text-[13px]">{closed}</p>}
-        {awaiting && (
+        {escalated && (
+          <p className="rounded-md border border-status-warning-border bg-status-warning-bg p-3 text-[13px] text-status-warning-fg">
+            Escalated to manager by {ops?.escalated_by ?? "an officer"}. Nothing has been sent.
+            {ops?.escalation_reason ? ` Reason: ${ops.escalation_reason}` : ""}
+          </p>
+        )}
+        {awaiting && !escalated && (
           <>
             <div className="flex flex-wrap gap-3">
               <div className="flex min-w-[140px] flex-1 flex-col gap-1">
@@ -309,6 +368,10 @@ export function ReplyPanel({
                 >
                   Approve edited reply
                 </Button>
+              ) : overLimit ? (
+                <Button disabled={busy || !actor} onClick={() => setConfirm("escalate")}>
+                  Escalate to manager
+                </Button>
               ) : (
                 <Button disabled={busy || caseFlagged || !actor} onClick={() => setConfirm("approve")}>
                   Approve and send reply
@@ -342,20 +405,24 @@ export function ReplyPanel({
             <DialogTitle>{confirmCopy.title}</DialogTitle>
             <DialogDescription>{confirmCopy.body}</DialogDescription>
           </DialogHeader>
-          {confirm === "reject" && (
+          {(confirm === "reject" || confirm === "escalate") && (
             <div className="flex flex-col gap-1">
               <Label htmlFor="reject-reason" className="text-xs font-medium text-muted-foreground">
                 Reason
               </Label>
               <Input id="reject-reason" value={reason} onChange={(e) => setReason(e.target.value)} />
-              {!reason.trim() && <p className="text-xs text-muted-foreground">Add a reason to reject this case.</p>}
+              {!reason.trim() && <p className="text-xs text-muted-foreground">Add a reason to {confirm === "escalate" ? "escalate" : "reject"} this case.</p>}
             </div>
           )}
           <DialogFooter>
             <Button variant="secondary" disabled={busy} onClick={() => setConfirm(null)}>
               Keep reviewing
             </Button>
-            {confirm === "reject" ? (
+            {confirm === "escalate" ? (
+              <Button disabled={busy || !reason.trim()} onClick={() => void escalate()}>
+                {confirmCopy.go}
+              </Button>
+            ) : confirm === "reject" ? (
               <Button
                 variant="outline"
                 className="border-destructive text-destructive hover:bg-status-critical-bg hover:text-destructive"
