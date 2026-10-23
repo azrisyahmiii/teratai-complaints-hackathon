@@ -74,6 +74,7 @@ def context(facts: FactSheet) -> dict[str, str]:
         "sla_days": str(facts.sla_days),
         "update_days": str(config.SCAM_UPDATE_WORKING_DAYS),
         "redress": mod.REDRESS,
+        "redress_bnm": mod.REDRESS_BNM,
         "scam_help": mod.SCAM_HELP,
         "at": "",
         "to": "",

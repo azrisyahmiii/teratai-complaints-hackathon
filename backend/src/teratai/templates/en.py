@@ -16,6 +16,8 @@ REDRESS = (
     "If you are not satisfied with this outcome, you may refer the matter to the Financial Markets Ombudsman "
     "Service (FMOS) or contact BNMLINK at 1-300-88-5465."
 )
+# Fee disputes: FMOS excludes "fees & charges" (commercial decisions; fmos.org.my FAQ Q9), so only BNMLINK is offered.
+REDRESS_BNM = "If you are not satisfied with this outcome, you may contact BNMLINK at 1-300-88-5465."
 SCAM_HELP = (
     "Please also call the National Scam Response Centre (NSRC) at 997 and, if advised, lodge a police report."
 )
@@ -70,7 +72,7 @@ TEXTS: dict[str, str] = {
     "{refund} " + REFUND_TIME + "." + CLOSE,
     "FEE_DISPUTE.DECLINE": OPEN
     + "We reviewed fee transaction {txn} of {charged} on {date}. The fee is in line with our fee schedule for your "
-    "account, so we are unable to refund it. {redress}" + CLOSE,
+    "account, so we are unable to refund it. {redress_bnm}" + CLOSE,
     "SERVICE_QUALITY.INFO_ONLY": OPEN
     + "We are sorry about the experience you described. We have recorded your feedback and passed it to the team "
     "concerned, who will review it and respond within {sla_days} working days." + CLOSE,

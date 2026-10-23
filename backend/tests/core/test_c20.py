@@ -99,3 +99,35 @@ def test_malay_replies_never_call_the_fraud_team_a_scam_team() -> None:
     assert "pasukan siasatan penipuan" in ms.TEXTS["SCAM_TRANSFER.INVESTIGATE"].lower()
     assert "pasukan siasatan penipuan" in ms.TEXTS["UNAUTHORISED_CARD.INVESTIGATE"].lower()
     assert 'never "pasukan penipuan"' in reply.SYSTEM_PROMPT and reply.PROMPT_VERSION == "reply-v2"
+
+
+# --- §9 #6: FMOS excludes fees & charges disputes (fmos.org.my FAQ Q9), so a fee decline offers BNMLINK only ---------
+def _first(category: str, outcome: str, language: str) -> str:
+    from teratai import data
+
+    return next(
+        lb.complaint_id
+        for lb in data.labels().values()
+        if (lb.category, lb.outcome, lb.reply_language) == (category, outcome, language)
+    )
+
+
+@pytest.mark.parametrize("language", ["EN", "MS"])
+def test_fee_decline_offers_bnmlink_not_fmos(language: str) -> None:
+    from teratai import data, reply
+    from teratai.templates import render
+
+    d = process_complaint(data.complaint(_first("FEE_DISPUTE", "DECLINE", language)), "eval")
+    assert d.outcome == "DECLINE" and d.facts.language == language
+    for text in (render(d.facts), reply.fact_sheet_text(d.facts)):
+        assert "BNMLINK" in text and "1-300-88-5465" in text
+        assert "FMOS" not in text and "Ombudsman" not in text
+    assert d.check_ok
+
+
+def test_other_declines_still_offer_fmos() -> None:
+    from teratai import data
+    from teratai.templates import render
+
+    d = process_complaint(data.complaint(_first("ATM_NOT_DISPENSED", "DECLINE", "EN")), "eval")
+    assert "FMOS" in render(d.facts) and "BNMLINK" in render(d.facts)

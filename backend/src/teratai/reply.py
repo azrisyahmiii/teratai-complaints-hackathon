@@ -306,6 +306,8 @@ def fact_sheet_text(facts: FactSheet) -> str:
     template = mod.TEXTS.get(key, "")
     if "{redress}" in template:
         lines.append(f"include_verbatim: {mod.REDRESS}")
+    if "{redress_bnm}" in template:
+        lines.append(f"include_verbatim: {mod.REDRESS_BNM}")
     if "{scam_help}" in template:
         lines.append(f"include_verbatim: {mod.SCAM_HELP}")
     return "\n".join(lines)

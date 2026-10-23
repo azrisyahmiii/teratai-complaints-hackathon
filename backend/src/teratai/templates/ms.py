@@ -16,6 +16,8 @@ REDRESS = (
     "Jika anda tidak berpuas hati dengan keputusan ini, anda boleh merujuk perkara ini kepada Financial Markets "
     "Ombudsman Service (FMOS) atau menghubungi BNMLINK di 1-300-88-5465."
 )
+# Fee disputes: FMOS excludes "fees & charges" (commercial decisions; fmos.org.my FAQ Q9), so only BNMLINK is offered.
+REDRESS_BNM = "Jika anda tidak berpuas hati dengan keputusan ini, anda boleh menghubungi BNMLINK di 1-300-88-5465."
 SCAM_HELP = "Sila hubungi juga National Scam Response Centre (NSRC) di 997 dan, jika dinasihatkan, buat laporan polis."
 REFUND_TIME = "dalam masa {sla_days} hari bekerja"
 
@@ -78,7 +80,7 @@ TEXTS: dict[str, str] = {
     "atas akaun anda, maka jumlah {refund} akan dikreditkan semula " + REFUND_TIME + "." + CLOSE,
     "FEE_DISPUTE.DECLINE": OPEN
     + "Kami telah menyemak transaksi yuran {txn} sebanyak {charged} pada {date}. Yuran tersebut adalah mengikut jadual "
-    "yuran bagi akaun anda, jadi kami tidak dapat memulangkan wang tersebut. {redress}" + CLOSE,
+    "yuran bagi akaun anda, jadi kami tidak dapat memulangkan wang tersebut. {redress_bnm}" + CLOSE,
     "SERVICE_QUALITY.INFO_ONLY": OPEN
     + "Kami memohon maaf atas pengalaman kurang menyenangkan yang anda alami. Aduan anda telah direkodkan dan "
     "dirujuk kepada pasukan berkenaan, yang akan menyemaknya dan memberi maklum balas dalam masa {sla_days} hari "
