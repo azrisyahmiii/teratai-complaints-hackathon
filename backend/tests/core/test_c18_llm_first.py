@@ -136,3 +136,13 @@ def test_language_tie_break_is_off_by_default_and_never_overrides_staff_notes(mo
     assert lang.reply_language(row, "MS")[0] == "MS"
     staff = row.model_copy(update={"channel": "Call centre note"})
     assert "call-centre note" in lang.reply_language(staff, "MS")[1]
+
+
+def test_template_groups_keep_twins_together_and_split_unrelated_texts() -> None:
+    texts = [
+        "Saya dicaj dua kali di GoRide sebanyak RM46.66",
+        "Saya dicaj dua kali di GoRide sebanyak RM89.10",
+        "The ATM did not give me my cash yesterday",
+    ]
+    g = classify.template_groups(texts)
+    assert g[0] == g[1] != g[2]

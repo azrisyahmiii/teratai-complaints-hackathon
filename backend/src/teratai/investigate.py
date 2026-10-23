@@ -25,7 +25,7 @@ from teratai import config, data, tools
 from teratai.llm import LLMError, Usage, get_provider, settings
 from teratai.models import Candidate, ComplaintRow, DateWindow, Emit, Issue, StageEvent, Understanding
 
-PROMPT_VERSION = "inv-v2"
+PROMPT_VERSION = "inv-v3"
 MAX_CALLS = config.INVESTIGATOR_MAX_CALLS
 MAX_SHOWN_CANDIDATES = 10  # matcher candidates shown to the model, best score first
 _TXN_ID = re.compile(r"^TXN-\d{7}$")
@@ -45,6 +45,9 @@ Rules:
   a date or a card that matches this transaction and no other. A transaction that merely exists in the
   allowed channels, or looks unusual, is NOT enough. If the text names nothing checkable, if two or more
   transactions fit equally, or if none fits, answer null.
+- Merchant and person names may be misspelt or spaced differently ("Go Ride" is GoRide, "gamevalt" is GameVault).
+  Compare ignoring case, spaces and small typos. Never pick a transaction whose amount and payee both differ from
+  the complaint.
 - The extracted clues come from a program and may be wrong (a mis-read amount, a missing date); the complaint
   text is the evidence. Say in the rationale if a clue disagrees with the text.
 - Category hints. DUPLICATE_CHARGE: the transaction is the LATER of two identical charges (same card, merchant

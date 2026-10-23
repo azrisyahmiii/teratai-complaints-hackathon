@@ -31,7 +31,7 @@ from numpy.typing import NDArray
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report
-from sklearn.model_selection import StratifiedKFold, cross_val_predict
+from sklearn.model_selection import GroupKFold, StratifiedKFold, cross_val_predict
 from sklearn.pipeline import FeatureUnion, Pipeline
 
 from teratai import config, data, dates, extract, lang
@@ -41,7 +41,8 @@ TARGET_ACCEPTED_ACCURACY = 0.99  # accepted (conf >= tau) OOF items must be at l
 MAX_BELOW_TAU_SHARE = 0.10  # at most this share of items may fall below tau (goes to the LLM)
 SCAM_PRECEDENCE_CONF = 0.95  # step 4: scam cue beats FAILED/UNAUTH labels below this confidence
 FOLDS = 5
-MODEL_VERSION = 2  # bump when features or hyper-parameters change, so a stale joblib is retrained
+GROUP_COSINE = 0.7  # complaints at least this similar (digits masked) share a template cluster: kept in one fold
+MODEL_VERSION = 3  # bump when features or hyper-parameters change, so a stale joblib is retrained
 
 NDF = NDArray[np.float64]
 
@@ -189,6 +190,22 @@ def choose_tau(conf: NDF, correct: NDArray[np.bool_]) -> tuple[float, dict[str, 
     }
 
 
+def template_groups(texts: list[str], threshold: float = GROUP_COSINE) -> NDArray[np.int_]:
+    """Cluster label per text: greedy leader clustering on cosine similarity of digit-masked word TF-IDF.
+
+    The training texts come from templates, so a plain stratified CV scores a text whose twin sits in the training
+    fold. Group K-fold over these clusters holds whole templates out, the honest estimate (robustness review 5.1.8).
+    """
+    masked = [re.sub(r"\d", "0", t.lower()) for t in texts]
+    x = TfidfVectorizer(analyzer="word", ngram_range=(1, 2), sublinear_tf=True).fit_transform(masked)
+    sim = (x @ x.T).toarray()
+    group = np.full(len(texts), -1, dtype=int)
+    for i in range(len(texts)):
+        if group[i] < 0:
+            group[(sim[i] >= threshold) & (group < 0)] = i
+    return group
+
+
 def train() -> Artifact:
     """Fit on all labelled complaints, compute 5-fold OOF probabilities and tau, persist to VAR_DIR."""
     t0 = time.perf_counter()
@@ -203,6 +220,21 @@ def train() -> Artifact:
     conf = oof.max(axis=1)
     correct = pred == y_arr
     tau, tau_stats = choose_tau(conf, correct)
+    # Honest estimate: whole template clusters held out. tau never drops below the in-template value, so a
+    # template-leaking CV can only make the guard stricter, not looser.
+    groups = template_groups(texts)
+    g_oof: NDF = cross_val_predict(_build_pipeline(), texts, y_arr, groups=groups, cv=GroupKFold(n_splits=FOLDS), method="predict_proba")
+    g_pred = np.array(classes)[g_oof.argmax(axis=1)]
+    g_correct = g_pred == y_arr
+    g_tau, g_stats = choose_tau(g_oof.max(axis=1), g_correct)
+    tau_stats = {
+        **tau_stats,
+        "group_oof_accuracy": float(g_correct.mean()),
+        "group_clusters": float(len(set(groups.tolist()))),
+        "tau_group": g_tau,
+        "group_accepted_accuracy": g_stats["accepted_accuracy"],
+    }
+    tau = max(tau, g_tau)
     art = Artifact(
         version=MODEL_VERSION,
         fingerprint=_fingerprint(ids, texts, y),
@@ -497,6 +529,11 @@ def _cv_report() -> None:
     print(f"decision errors: {len(errors)}  e.g. {errors[:8]}")
     fp = sum(not tier0(data.complaint(i)).is_complaint for i in ids)
     print(f"labelled complaints flagged is_complaint=False: {fp}/{len(ids)}")
+    print(
+        f"group K-fold by template ({art.stats['group_clusters']:.0f} clusters, cosine {GROUP_COSINE}): "
+        f"accuracy {art.stats['group_oof_accuracy']:.4f}; tau_group {art.stats['tau_group']:.4f} "
+        f"(accepted accuracy {art.stats['group_accepted_accuracy']:.4f}); tau used = max(in-template, group) = {art.tau:.4f}"
+    )
     print(f"train time (CV + final fit): {art.stats['train_seconds']:.1f}s")
 
 
