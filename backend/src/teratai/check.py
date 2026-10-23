@@ -400,7 +400,7 @@ def check_reply(text: str, facts: FactSheet) -> CheckResult:
             )
         )
     words = len(text.split())
-    if words < config.REPLY_MIN_WORDS and facts.ids.get("state") != "wrong_customer":
+    if words < config.REPLY_MIN_WORDS:
         issues.append(
             CheckIssue(
                 code="HYGIENE",

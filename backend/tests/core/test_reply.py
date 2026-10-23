@@ -213,16 +213,16 @@ def test_reply_mode_template_never_calls_the_model(monkeypatch: pytest.MonkeyPat
     assert r.drafts == [r.text]
 
 
-def test_wrong_customer_gets_an_empty_reply_and_no_call(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_wrong_customer_gets_a_verification_reply_and_no_call(monkeypatch: pytest.MonkeyPatch) -> None:
     base = _facts("CMP-00244")
     fake = _fake(monkeypatch, [])
-    facts = base.model_copy(update={"ids": {**base.ids, "state": "wrong_customer"}})
+    facts = base.model_copy(update={"ids": {**base.ids, "state": "wrong_customer"}, "outcome": "INVESTIGATE", "refund_myr": Decimal("0.00")})
     events: list[StageEvent] = []
 
     r = reply.write_reply(facts, "live", events.append)
 
     assert fake.calls == []
-    assert r.text == ""
+    assert r.text and r.check.ok
     assert r.source == "template"
     assert [e.stage for e in events] == ["reply"]
 

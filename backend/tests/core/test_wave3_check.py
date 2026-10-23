@@ -166,7 +166,7 @@ def test_empty_or_trivial_reply_fails(f244: FactSheet, text: str) -> None:
     assert not result.ok and "HYGIENE" in [i.code for i in result.issues], text
 
 
-def test_empty_reply_is_fine_for_wrong_customer() -> None:
+def test_empty_reply_fails_even_for_wrong_customer() -> None:
     f = FactSheet.model_validate(
         {
             **_ALL_FACTS,
@@ -180,7 +180,7 @@ def test_empty_reply_is_fine_for_wrong_customer() -> None:
             "refund_myr": Decimal("0.00"),
         }
     )
-    assert check.check_reply("", f).ok
+    assert not check.check_reply("", f).ok
 
 
 # --- 6: URLs and emails ---------------------------------------------------------------------------------------

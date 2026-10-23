@@ -90,6 +90,12 @@ TEXTS: dict[str, str] = {
     "NEEDS_INFO.SCAM": OPEN
     + "Untuk menyemak aduan anda, kami memerlukan sedikit maklumat tambahan. Sila balas dengan tarikh transaksi, "
     "jumlahnya dan nama penerima. {scam_help}" + CLOSE,
+    "WRONG_CUSTOMER": OPEN
+    + "Kami tidak dapat memadankan kad atau akaun yang dinyatakan dalam mesej anda dengan akaun anda sendiri di bank "
+    "kami, jadi belum ada keputusan dibuat. Sila balas dengan 4 digit terakhir kad anda sendiri atau butiran akaun "
+    "anda supaya kami dapat membuat pengesahan. Jika aduan ini berkaitan akaun ahli keluarga atau orang lain, kami "
+    "hanya boleh membincangkannya dengan pemegang akaun, yang dialu-alukan menghubungi pihak bank secara terus."
+    + CLOSE,
     "NOT_COMPLAINT": "{who},\n\nTerima kasih kerana menghubungi pihak bank. Kami tidak menemui sebarang aduan atau "
     "permintaan dalam mesej anda. Jika anda memerlukan bantuan mengenai akaun anda, sila balas dengan butiran dan kami "
     "akan membantu anda." + CLOSE,

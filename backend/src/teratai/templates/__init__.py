@@ -30,6 +30,8 @@ def state_of(facts: FactSheet) -> str:
 
 def template_key(facts: FactSheet) -> str:
     state = state_of(facts)
+    if state == "wrong_customer":
+        return "WRONG_CUSTOMER"
     if state == "needs_info":
         return "NEEDS_INFO.SCAM" if facts.category == "SCAM_TRANSFER" else "NEEDS_INFO"
     if state == "not_complaint":
@@ -99,7 +101,6 @@ def render_key(facts: FactSheet, key: str) -> str:
 
 
 def render(facts: FactSheet) -> str:
-    """The deterministic reply text. Empty for `wrong_customer`: no customer-facing reply is sent (SPEC §6)."""
-    if state_of(facts) == "wrong_customer":
-        return ""
+    """The deterministic reply text; never empty. `wrong_customer` gets a verification reply that names no
+    transaction, amount or payee (nothing about another customer's data)."""
     return render_key(facts, template_key(facts))

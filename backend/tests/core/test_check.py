@@ -299,12 +299,13 @@ def test_every_template_key_renders_and_passes(key: str, language: str) -> None:
     category, _, rest = key.partition(".")
     kw = dict(_ALL_FACTS)
     state = "decided"
-    if key in ("NEEDS_INFO", "NEEDS_INFO.SCAM", "NOT_COMPLAINT", "GENERIC"):
+    if key in ("NEEDS_INFO", "NEEDS_INFO.SCAM", "NOT_COMPLAINT", "GENERIC", "WRONG_CUSTOMER"):
         category, outcome = ("SCAM_TRANSFER" if key == "NEEDS_INFO.SCAM" else "SERVICE_QUALITY"), "DECLINE"
         state = {
             "NEEDS_INFO": "needs_info",
             "NEEDS_INFO.SCAM": "needs_info",
             "NOT_COMPLAINT": "not_complaint",
+            "WRONG_CUSTOMER": "wrong_customer",
         }.get(key, "decided")
     else:
         outcome = rest.split(".")[0]
@@ -335,7 +336,7 @@ def test_every_template_key_renders_and_passes(key: str, language: str) -> None:
     )
 
 
-def test_wrong_customer_gets_no_reply() -> None:
+def test_wrong_customer_gets_a_verification_reply() -> None:
     f = FactSheet.model_validate(
         {
             **_ALL_FACTS,
@@ -349,9 +350,9 @@ def test_wrong_customer_gets_no_reply() -> None:
             "refund_myr": Decimal("0.00"),
         }
     )
-    assert templates.render(f) == ""
+    assert templates.render(f) != ""
     r = reply.write_reply(f, "batch", _noop)
-    assert r.text == "" and r.check.ok
+    assert r.text and r.check.ok
 
 
 def test_missing_fact_falls_back_to_the_generic_reply() -> None:

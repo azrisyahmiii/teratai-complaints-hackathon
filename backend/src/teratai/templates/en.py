@@ -81,6 +81,11 @@ TEXTS: dict[str, str] = {
     "NEEDS_INFO.SCAM": OPEN
     + "To look into your complaint we need a little more information. Please reply with the date of the transaction, "
     "the amount and the name of the recipient. {scam_help}" + CLOSE,
+    "WRONG_CUSTOMER": OPEN
+    + "We could not match the card or account mentioned in your message to your own accounts with us, so we have made "
+    "no decision yet. Please reply with the last 4 digits of your own card or your account details so that we can "
+    "verify them. If your complaint concerns a family member's or another person's account, we can only discuss it "
+    "with the account holder, who is welcome to contact the bank directly." + CLOSE,
     "NOT_COMPLAINT": "Dear {who},\n\nThank you for your message. We could not find a complaint or request in it. If you "
     "need help with your account, please reply with the details and we will assist you." + CLOSE,
     "GENERIC": OPEN
