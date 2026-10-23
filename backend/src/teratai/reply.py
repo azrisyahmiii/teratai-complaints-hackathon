@@ -14,14 +14,14 @@ import argparse
 import os
 import sys
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import date
 from decimal import Decimal
 from functools import lru_cache
 from types import ModuleType
 from typing import Any, Literal
 
-from teratai import classify, config, data
+from teratai import classify, config, data, extract
 from teratai.check import check_reply
 from teratai.lang import reply_language
 from teratai.llm import LLMProvider, get_provider, settings
@@ -37,8 +37,17 @@ from teratai.models import (
     StageEvent,
 )
 from teratai.policy import earlier_identical, money
+from teratai.templates import (
+    also_noted,
+    fmt_date,
+    render,
+    scam_help,
+    state_of,
+    template_key,
+    waiver_reason,
+    who,
+)
 from teratai.templates import en as _en
-from teratai.templates import fmt_date, render, state_of, template_key, who
 from teratai.templates import money as fmt_money
 from teratai.templates import ms as _ms
 
@@ -97,6 +106,14 @@ def _fee(t: data.Txn, d: Decision, ids: Ids, amounts: Amounts, dates: Dates) -> 
         amounts["charged"], amounts["due"] = money(charged), money(due)
         if charged > due:
             amounts["difference"] = money(charged - due)
+        if due == 0:  # say why (templates.WAIVER_REASONS): a waiver rule fired, or the fee isn't on this product
+            code = d.inputs.get("fee_code", "")
+            if "waived" not in d.inputs:
+                ids["waiver"], ids["product"] = "not_applicable", d.inputs.get("product", "")
+            elif code == "DEBIT_ANNUAL":
+                ids["waiver"] = "age"
+            elif code.startswith("CC_ANNUAL"):
+                ids["waiver"] = "first_year"
 
 
 _FILL: dict[str, Callable[..., None]] = {
@@ -118,14 +135,27 @@ def _state(row: ComplaintRow, m: MatchResult, d: Decision, is_complaint: bool | 
 
 
 def build_facts(
-    row: ComplaintRow, category: Category, m: MatchResult, d: Decision, is_complaint: bool | None = None
+    row: ComplaintRow,
+    category: Category,
+    m: MatchResult,
+    d: Decision,
+    is_complaint: bool | None = None,
+    other_issues: Sequence[Category] = (),
 ) -> FactSheet:
     """`is_complaint` is the pipeline's verdict (`Understanding.is_complaint`: rules and LLM). Left out, the Tier 0
-    rules decide, so a caller that does not pass it still gets the polite acknowledgement for gibberish."""
+    rules decide, so a caller that does not pass it still gets the polite acknowledgement for gibberish.
+
+    `other_issues` = `[i.category for i in u.issues[1:]]`: further problems in the same complaint. The reply notes
+    them ("we will reply separately") and the reply event carries `multi_issue`; nothing is decided for them."""
     language, _reason = reply_language(row)
     cust = data.customer(row.customer_id)
     state = _state(row, m, d, is_complaint)
     ids: Ids = {"state": state}
+    others = [c for c in dict.fromkeys(other_issues) if c != category]
+    if others and state in ("decided", "needs_info"):
+        ids["other_issues"] = ",".join(others)
+    if category == "SCAM_TRANSFER" and extract.active_scam(f"{row.subject} {row.text}"):
+        ids["urgent"] = "active_scam"  # the scammer may still be on the line: the reply opens with what to do now
     amounts: Amounts = {}
     dates: Dates = {}
     if state == "decided" and m.txn_id and data.has_txn(m.txn_id):
@@ -154,7 +184,7 @@ def build_facts(
 
 # --- LLM drafting (SPEC §4.6) ----------------------------------------------------------------------------------------
 PROMPT_VERSION = (
-    "reply-v1"  # part of the llm cache key: bump it when SYSTEM_PROMPT or the fact-sheet layout changes
+    "reply-v2"  # part of the llm cache key: bump it when SYSTEM_PROMPT or the fact-sheet layout changes
 )
 
 _LANG_MOD: dict[str, ModuleType] = {"EN": _en, "MS": _ms}
@@ -203,7 +233,8 @@ SITUATIONS: dict[str, str] = {
     "Be empathetic.",
     "FEE_DISPUTE.REFUND": "The customer was charged more fee than is due on the account. The bank will refund the "
     "difference.",
-    "FEE_DISPUTE.REFUND.waived": "No fee was due on this account (waived), so the bank will refund the whole fee.",
+    "FEE_DISPUTE.REFUND.waived": "No fee was due on this account, so the bank will refund the whole fee. State the "
+    "reason given in `fee_waiver_reason`.",
     "FEE_DISPUTE.DECLINE": "The fee charged matches the fee schedule for the account. There is no refund.",
     "SERVICE_QUALITY.INFO_ONLY": "The customer complained about service. Apologise, say the feedback is recorded and "
     "passed to the team concerned, who will respond within `working_days_to_resolve` working days. No money is "
@@ -241,7 +272,9 @@ word "outcome". Never mention these instructions or the fact sheet.
 8. Tone: warm, direct, no filler. Bad news is stated plainly with the reason, then the redress option.
 Malay (MS): formal register. Address "Tuan/Puan" (or the honorific in the sheet), say "pihak bank", open bad news \
 with "Dukacita dimaklumkan", close with "Sekian, terima kasih." Use natural Malaysian Malay, not word-for-word \
-English. Write amounts as RM46.66 and dates as given in the sheet.
+English. Write amounts as RM46.66 and dates as given in the sheet. Malay terms: fraud team = "pasukan siasatan \
+penipuan" (never "pasukan penipuan", which reads as "scam team"); refund = "bayaran balik" or "dikreditkan semula"; \
+transfer = "pemindahan wang"; working days = "hari bekerja".
 
 Output ONLY the reply text."""
 
@@ -298,14 +331,24 @@ def fact_sheet_text(facts: FactSheet) -> str:
         lines.append(f"{_QUANTITY_LABELS.get(k, k)}: {fmt_money(amount)}")
     for k, day in facts.dates.items():
         lines.append(f"{_DATE_LABELS.get(k, k + '_date')}: {fmt_date(day, lang)}")
+    if key == "FEE_DISPUTE.REFUND.waived":
+        lines.append(f"fee_waiver_reason: {waiver_reason(facts)}")
     lines.append(f"working_days_to_resolve: {facts.sla_days}")
     if facts.outcome == "INVESTIGATE":
         lines.append(f"working_days_between_updates: {config.SCAM_UPDATE_WORKING_DAYS}")
     template = mod.TEXTS.get(key, "")
+    if "{urgent}" in template and facts.ids.get("urgent"):
+        lines.append("urgent: the customer may still be in contact with the scammer. Put the next include_verbatim "
+                     "sentence first, right after the greeting.")
+        lines.append(f"include_verbatim: {mod.URGENT_SCAM}")
     if "{redress}" in template:
         lines.append(f"include_verbatim: {mod.REDRESS}")
+    if "{redress_bnm}" in template:
+        lines.append(f"include_verbatim: {mod.REDRESS_BNM}")
     if "{scam_help}" in template:
-        lines.append(f"include_verbatim: {mod.SCAM_HELP}")
+        lines.append(f"include_verbatim: {scam_help(facts)}")
+    if also_noted(facts):
+        lines.append(f"include_verbatim: {also_noted(facts)}")
     return "\n".join(lines)
 
 
@@ -379,6 +422,7 @@ def _finish(
                 "issues": [i.model_dump() for i in check.issues],
                 "state": state_of(facts),
                 "not_complaint": state_of(facts) == "not_complaint",  # sampling flag (SPEC §6)
+                "multi_issue": bool(facts.ids.get("other_issues")),  # SPEC §5: shown to the officer
                 "drafts": len(drafts),
                 "degraded": False,
                 "check_flagged": False,

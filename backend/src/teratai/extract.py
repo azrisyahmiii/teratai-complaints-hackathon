@@ -212,7 +212,7 @@ _FILLER = (
     r"(?:card|kad|number|num|no\.?|nombor|my|saya|is|ialah|yang|dengan|with|in|"
     r"ending|berakhir|hujung|akhir|last\s+(?:4|four)\s+digits?|digits?|of\s+the\s+card)"
 )
-_NOT_DIGIT_TAIL = r"(?![\d.,:/\-]|\s*(?:hrs?|am|pm|jam|ringgit|sen|%))"
+_NOT_DIGIT_TAIL = r"(?![\d:/\-]|[.,]\d|\s*(?:hrs?|am|pm|jam|ringgit|sen|%))"  # "2832." ends a sentence, "2832.50" is money
 _CARD_LAST4 = re.compile(
     rf"\b{_CARD_WORD}\b(?:\s+{_FILLER}(?=[\s:#]))*\s*[:#]?\s*(?P<d>\d{{4}}){_NOT_DIGIT_TAIL}", re.IGNORECASE
 )
@@ -224,12 +224,25 @@ _CARD_ENDING = re.compile(
 _CARD_LAST4_ALT = re.compile(
     rf"(?:\*{{2,}}|x{{2,}}|last\s+(?:4|four)\s+digits?(?:\s+is)?)\s*(?P<d>\d{{4}}){_NOT_DIGIT_TAIL}", re.IGNORECASE
 )
+# A full card number (PAN, 13-19 digits, maybe grouped: "4111 1111 1111 3691"): its last four are the card's last
+# four. The first group is the issuer prefix, which _CARD_LAST4 alone would read. Without a card word, only the
+# 4-4-4-4 grouping counts, and never after an account word (a recipient's account number).
+_PAN_RUN = r"(?<!\d)\d(?:[ -]?\d){12,18}(?![ -]?\d)"
+_CARD_PAN = re.compile(rf"\b{_CARD_WORD}\b(?:\s+{_FILLER}(?=[\s:#]))*\s*[:#]?\s*(?P<pan>{_PAN_RUN})", re.IGNORECASE)
+_GROUPED_PAN = re.compile(
+    r"(?<!account )(?<!akaun )(?<!acc )(?<!acct )(?<!a/c )(?<![\d-])(?P<pan>\d{4}([ -])\d{4}\2\d{4}\2\d{4})(?![ -]?\d)",
+    re.IGNORECASE,
+)
 # A bare year is not a card number: 2024-2030 counts only after an explicit "ending" / "number" style word.
 _YEAR = re.compile(r"20(?:2\d|30)$")
 _EXPLICIT = re.compile(r"ending|berakhir|hujung|akhir|number|nombor|\bno\b|digit", re.IGNORECASE)
 
 
 def card_last4(text: str) -> str | None:
+    for pan_rx in (_CARD_PAN, _GROUPED_PAN):
+        pan = pan_rx.search(text)
+        if pan:
+            return re.sub(r"\D", "", pan.group("pan"))[-4:]
     for rx in (_CARD_LAST4, _CARD_ENDING, _CARD_LAST4_ALT):
         for m in rx.finditer(text):
             d = m.group("d")
@@ -237,6 +250,43 @@ def card_last4(text: str) -> str | None:
                 continue
             return d
     return None
+
+
+# Card numbers and MyKad IC numbers never reach the LLM: they are masked to their last 4 digits first.
+_SENSITIVE = re.compile(rf"{_PAN_RUN}|(?<!\d)\d{{6}}-\d{{2}}-\d{{4}}(?!\d)")
+
+
+def mask_sensitive(text: str) -> str:
+    """'4111 1111 1111 3691' -> '**** **** **** 3691', '740529-10-5531' -> '******-**-5531'."""
+
+    def _mask(m: re.Match[str]) -> str:
+        out, keep = [], 4
+        for ch in reversed(m.group(0)):
+            out.append("*" if ch.isdigit() and keep <= 0 else ch)
+            keep -= ch.isdigit()
+        return "".join(reversed(out))
+
+    return _SENSITIVE.sub(_mask, text)
+
+
+# --- a scam still in progress: the scammer is on the line or asking for more ("he wants more") ----------------
+# The reply then opens with "end the call, don't send more, call NSRC 997 now". "lebih kurang" is "about", not "more".
+_ACTIVE_SCAM = re.compile(
+    r"\bstill\s+(?:on\s+the\s+(?:phone|line|call)|talking|calling|in\s+contact|messaging|texting|chatting|whatsapp)"
+    r"|\bon\s+the\s+(?:phone|line)\s+with\b"
+    r"|\b(?:wants?|asking|asks|keeps?\s+asking|telling|pressuring|forcing|pushing)\s+(?:me\s+)?(?:to\s+)?"
+    r"(?:send|transfer|pay|bank\s+in|deposit|top\s+up)?\s*(?:more|again|another)\b"
+    r"|\bmasih\s+(?:dalam\s+talian|di\s+talian|bercakap|berhubung|call|telefon|menelefon|hubungi|whatsapp|mesej)"
+    r"|\bsedang\s+(?:bercakap|dalam\s+talian|di\s+talian)"
+    r"|\b(?:minta|suruh|desak|paksa)\w*\s+(?:saya\s+)?(?:untuk\s+)?(?:transfer|pindah|bayar|hantar|masuk)\w*\s+"
+    r"(?:lagi|lebih(?!\s+kurang)|tambah)"
+    r"|\b(?:nak|mahu|minta)\s+(?:duit|wang)\s+lagi\b",
+    re.IGNORECASE,
+)
+
+
+def active_scam(text: str) -> bool:
+    return _ACTIVE_SCAM.search(text) is not None
 
 
 # --- third party (SPEC §6 "Wrong customer": "my friend's account") ------------------------------------------
@@ -678,8 +728,8 @@ def _to_detail(raw: _RawIssue) -> LLMDetail:
 
 def _user_message(row: ComplaintRow, note: str | None = None) -> str:
     # The delimiter cannot be closed from inside the text.
-    text = row.text.replace("</complaint>", "")
-    subject = row.subject.replace("</complaint>", "")
+    text = mask_sensitive(row.text).replace("</complaint>", "")
+    subject = mask_sensitive(row.subject).replace("</complaint>", "")
     body = f"<complaint>\nchannel: {row.channel}\nsubject: {subject}\ntext: {text}\n</complaint>"
     if note:
         body += f"\n\n{note}"

@@ -16,10 +16,37 @@ REDRESS = (
     "If you are not satisfied with this outcome, you may refer the matter to the Financial Markets Ombudsman "
     "Service (FMOS) or contact BNMLINK at 1-300-88-5465."
 )
+# Fee disputes: FMOS excludes "fees & charges" (commercial decisions; fmos.org.my FAQ Q9), so only BNMLINK is offered.
+REDRESS_BNM = "If you are not satisfied with this outcome, you may contact BNMLINK at 1-300-88-5465."
 SCAM_HELP = (
     "Please also call the National Scam Response Centre (NSRC) at 997 and, if advised, lodge a police report."
 )
+# A scam still in progress (FactSheet.ids["urgent"]): this comes first. BNM: "immediately call ... NSRC at 997".
+URGENT_SCAM = (
+    "If anyone is still contacting you about this, please end the call now, do not transfer any more money or share "
+    "your TAC or PIN, and call the National Scam Response Centre (NSRC) at 997 immediately."
+)
+SCAM_HELP_AFTER_URGENT = "If advised, please also lodge a police report."  # 997 is already in URGENT_SCAM
+# A complaint with several problems: the reply decides the first and notes the rest (FactSheet.ids["other_issues"]).
+TOPICS = {
+    "DUPLICATE_CHARGE": "duplicate card charge",
+    "FAILED_TRANSFER": "failed transfer",
+    "ATM_NOT_DISPENSED": "ATM cash withdrawal",
+    "UNAUTHORISED_CARD": "disputed card transaction",
+    "SCAM_TRANSFER": "report of a scam transfer",
+    "FEE_DISPUTE": "question about a fee",
+    "SERVICE_QUALITY": "feedback about our service",
+}
+ALSO_NOTED = "We have also noted your {topics}. Our team will look into it and reply to you separately."
 REFUND_TIME = "within {sla_days} working days"
+# Why no fee was due (FactSheet.ids["waiver"], set by reply._fee). A final decision states its reason (BNM).
+WAIVER_REASONS = {
+    "age": "No fee was due on your account, as the annual debit card fee is waived for customers aged {waiver_age} "
+    "and above",
+    "first_year": "No fee was due on your account, as the annual fee is waived in your credit card's first year",
+    "not_applicable": "No fee was due, as this fee does not apply to {product} accounts",
+    "": "No fee was due on your account",
+}
 
 TEXTS: dict[str, str] = {
     "DUPLICATE_CHARGE.REFUND": OPEN
@@ -58,7 +85,7 @@ TEXTS: dict[str, str] = {
     "{update_days} working days. No decision on a refund has been made yet. Please keep your card safe and tell us at once about any other transaction you do not recognise."
     + CLOSE,
     "SCAM_TRANSFER.INVESTIGATE": OPEN
-    + "We are very sorry to hear this. Our fraud team has started investigating your transfer{to} of {amount} on {date} "
+    + "{urgent}We are very sorry to hear this. Our fraud team has started investigating your transfer{to} of {amount} on {date} "
     "(transaction {txn}) and will attempt to recall the funds, although recovery cannot be guaranteed. {scam_help} "
     "We will update you at least every {update_days} working days until the investigation is complete."
     + CLOSE,
@@ -66,11 +93,11 @@ TEXTS: dict[str, str] = {
     + "We reviewed fee transaction {txn} of {charged} on {date}. The fee due on your account was {due}. We will "
     "refund the difference of {refund} " + REFUND_TIME + "." + CLOSE,
     "FEE_DISPUTE.REFUND.waived": OPEN
-    + "We reviewed fee transaction {txn} of {charged} on {date}. No fee was due on your account, so we will refund "
-    "{refund} " + REFUND_TIME + "." + CLOSE,
+    + "We reviewed fee transaction {txn} of {charged} on {date}. {waiver_reason}, so we will refund {refund} "
+    + REFUND_TIME + "." + CLOSE,
     "FEE_DISPUTE.DECLINE": OPEN
     + "We reviewed fee transaction {txn} of {charged} on {date}. The fee is in line with our fee schedule for your "
-    "account, so we are unable to refund it. {redress}" + CLOSE,
+    "account, so we are unable to refund it. {redress_bnm}" + CLOSE,
     "SERVICE_QUALITY.INFO_ONLY": OPEN
     + "We are sorry about the experience you described. We have recorded your feedback and passed it to the team "
     "concerned, who will review it and respond within {sla_days} working days." + CLOSE,
@@ -79,7 +106,7 @@ TEXTS: dict[str, str] = {
     "the amount and the name of the merchant or recipient. Once we have these details we will review your case within "
     "{sla_days} working days." + CLOSE,
     "NEEDS_INFO.SCAM": OPEN
-    + "To look into your complaint we need a little more information. Please reply with the date of the transaction, "
+    + "{urgent}To look into your complaint we need a little more information. Please reply with the date of the transaction, "
     "the amount and the name of the recipient. {scam_help}" + CLOSE,
     "WRONG_CUSTOMER": OPEN
     + "We could not match the card or account mentioned in your message to your own accounts with us, so we have made "

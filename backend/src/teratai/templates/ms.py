@@ -16,8 +16,37 @@ REDRESS = (
     "Jika anda tidak berpuas hati dengan keputusan ini, anda boleh merujuk perkara ini kepada Financial Markets "
     "Ombudsman Service (FMOS) atau menghubungi BNMLINK di 1-300-88-5465."
 )
+# Fee disputes: FMOS excludes "fees & charges" (commercial decisions; fmos.org.my FAQ Q9), so only BNMLINK is offered.
+REDRESS_BNM = "Jika anda tidak berpuas hati dengan keputusan ini, anda boleh menghubungi BNMLINK di 1-300-88-5465."
 SCAM_HELP = "Sila hubungi juga National Scam Response Centre (NSRC) di 997 dan, jika dinasihatkan, buat laporan polis."
+URGENT_SCAM = (
+    "Jika ada sesiapa yang masih menghubungi anda berkaitan perkara ini, sila tamatkan panggilan sekarang, jangan "
+    "pindahkan wang lagi atau kongsi TAC atau PIN anda, dan hubungi National Scam Response Centre (NSRC) di 997 "
+    "dengan segera."
+)
+SCAM_HELP_AFTER_URGENT = "Jika dinasihatkan, sila buat laporan polis juga."
+TOPICS = {
+    "DUPLICATE_CHARGE": "caj kad berganda",
+    "FAILED_TRANSFER": "pemindahan wang yang gagal",
+    "ATM_NOT_DISPENSED": "pengeluaran tunai di ATM",
+    "UNAUTHORISED_CARD": "transaksi kad yang dipertikaikan",
+    "SCAM_TRANSFER": "laporan pemindahan wang akibat penipuan",
+    "FEE_DISPUTE": "pertanyaan mengenai yuran",
+    "SERVICE_QUALITY": "maklum balas tentang perkhidmatan kami",
+}
+ALSO_NOTED = (
+    "Kami juga telah mengambil maklum tentang {topics} yang anda kemukakan. Pasukan kami akan menyemaknya dan memberi "
+    "maklum balas kepada anda secara berasingan."
+)
 REFUND_TIME = "dalam masa {sla_days} hari bekerja"
+WAIVER_REASONS = {
+    "age": "Tiada yuran sepatutnya dikenakan ke atas akaun anda kerana yuran tahunan kad debit dikecualikan bagi "
+    "pelanggan berumur {waiver_age} tahun ke atas",
+    "first_year": "Tiada yuran sepatutnya dikenakan ke atas akaun anda kerana yuran tahunan dikecualikan bagi tahun "
+    "pertama kad kredit anda",
+    "not_applicable": "Tiada yuran sepatutnya dikenakan kerana yuran ini tidak terpakai bagi akaun {product}",
+    "": "Tiada yuran sepatutnya dikenakan ke atas akaun anda",
+}
 
 TEXTS: dict[str, str] = {
     "DUPLICATE_CHARGE.REFUND": OPEN
@@ -62,11 +91,11 @@ TEXTS: dict[str, str] = {
     "Jumlah {refund} akan dikreditkan semula ke akaun anda " + REFUND_TIME + "." + CLOSE,
     "UNAUTHORISED_CARD.INVESTIGATE": OPEN
     + "Kami telah menerima laporan anda mengenai transaksi kad {txn} sebanyak {amount}{at} pada {date}. Pasukan "
-    "penipuan kami sedang menyiasat dan akan menghubungi anda dalam masa {sla_days} hari bekerja, kemudian akan memaklumkan perkembangan sekurang-kurangnya setiap "
+    "siasatan penipuan kami sedang meneliti transaksi ini dan akan menghubungi anda dalam masa {sla_days} hari bekerja, kemudian akan memaklumkan perkembangan sekurang-kurangnya setiap "
     "{update_days} hari bekerja. Belum ada keputusan mengenai pemulangan wang. Sila pastikan kad anda selamat dan maklumkan kepada kami dengan segera tentang "
     "sebarang transaksi lain yang anda tidak kenali." + CLOSE,
     "SCAM_TRANSFER.INVESTIGATE": OPEN
-    + "Kami memohon maaf atas kesulitan yang anda alami. Pasukan penipuan kami telah mula menyiasat "
+    + "{urgent}Kami memohon maaf atas kesulitan yang anda alami. Pasukan siasatan penipuan kami telah mula meneliti "
     "pemindahan wang anda{to} sebanyak {amount} pada {date} (transaksi {txn}) dan akan cuba menuntut semula dana "
     "tersebut, walaupun pemulihan tidak dijamin. {scam_help} Kami akan memaklumkan perkembangan sekurang-kurangnya "
     "setiap {update_days} hari bekerja sehingga siasatan selesai." + CLOSE,
@@ -74,11 +103,11 @@ TEXTS: dict[str, str] = {
     + "Kami telah menyemak transaksi yuran {txn} sebanyak {charged} pada {date}. Yuran yang sepatutnya dikenakan ialah "
     "{due}. Beza sebanyak {refund} akan dikreditkan semula ke akaun anda " + REFUND_TIME + "." + CLOSE,
     "FEE_DISPUTE.REFUND.waived": OPEN
-    + "Kami telah menyemak transaksi yuran {txn} sebanyak {charged} pada {date}. Tiada yuran sepatutnya dikenakan ke "
-    "atas akaun anda, maka jumlah {refund} akan dikreditkan semula " + REFUND_TIME + "." + CLOSE,
+    + "Kami telah menyemak transaksi yuran {txn} sebanyak {charged} pada {date}. {waiver_reason}, maka jumlah {refund} "
+    "akan dikreditkan semula " + REFUND_TIME + "." + CLOSE,
     "FEE_DISPUTE.DECLINE": OPEN
     + "Kami telah menyemak transaksi yuran {txn} sebanyak {charged} pada {date}. Yuran tersebut adalah mengikut jadual "
-    "yuran bagi akaun anda, jadi kami tidak dapat memulangkan wang tersebut. {redress}" + CLOSE,
+    "yuran bagi akaun anda, jadi kami tidak dapat memulangkan wang tersebut. {redress_bnm}" + CLOSE,
     "SERVICE_QUALITY.INFO_ONLY": OPEN
     + "Kami memohon maaf atas pengalaman kurang menyenangkan yang anda alami. Aduan anda telah direkodkan dan "
     "dirujuk kepada pasukan berkenaan, yang akan menyemaknya dan memberi maklum balas dalam masa {sla_days} hari "
@@ -88,7 +117,7 @@ TEXTS: dict[str, str] = {
     "jumlahnya dan nama pedagang atau penerima. Setelah kami menerima maklumat ini, kami akan menyemak kes anda dalam "
     "masa {sla_days} hari bekerja." + CLOSE,
     "NEEDS_INFO.SCAM": OPEN
-    + "Untuk menyemak aduan anda, kami memerlukan sedikit maklumat tambahan. Sila balas dengan tarikh transaksi, "
+    + "{urgent}Untuk menyemak aduan anda, kami memerlukan sedikit maklumat tambahan. Sila balas dengan tarikh transaksi, "
     "jumlahnya dan nama penerima. {scam_help}" + CLOSE,
     "WRONG_CUSTOMER": OPEN
     + "Kami tidak dapat memadankan kad atau akaun yang dinyatakan dalam mesej anda dengan akaun anda sendiri di bank "

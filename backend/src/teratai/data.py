@@ -6,13 +6,15 @@ Lookups by id raise `KeyError`; use `has_customer` / `has_txn` to test existence
 """
 
 import csv
+import functools
 import re
-from collections.abc import Iterator
+import threading
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
-from functools import cache
 from pathlib import Path
+from typing import Any, Generic, TypeVar
 
 from teratai import config
 from teratai.models import ComplaintRow
@@ -113,6 +115,36 @@ class PolicyRow:
 
 _REVERSAL_RE = re.compile(r"Reversal of (TXN-\d{7})")
 
+T = TypeVar("T")
+
+
+class once(Generic[T]):  # lower-case: used as a decorator, like functools.cache
+    """`functools.cache` for a zero-argument loader, but thread-safe: concurrent cold callers build it once.
+
+    `functools.cache` doesn't lock, so 20 first requests at once each rebuilt the 156k-row txn index (59 s cold).
+    The lock is re-entrant so a loader may call `cache_clear()` on itself (classify.train does).
+    """
+
+    def __init__(self, fn: Callable[[], T]) -> None:
+        functools.update_wrapper(self, fn)
+        self._fn = fn
+        self._lock = threading.RLock()
+        self._box: tuple[T] | None = None
+
+    def __call__(self) -> T:
+        box = self._box
+        if box is None:
+            with self._lock:
+                if self._box is None:
+                    value = self._fn()
+                    self._box = (value,)
+                box = self._box
+        return box[0]
+
+    def cache_clear(self) -> None:
+        with self._lock:
+            self._box = None
+
 
 def _rows(name: str) -> Iterator[dict[str, str]]:
     path: Path = config.DATA_DIR / name
@@ -127,7 +159,7 @@ def _dt(s: str) -> datetime:
 # --- customers, accounts ---------------------------------------------------------------------------
 
 
-@cache
+@once
 def _customers() -> dict[str, Customer]:
     return {
         r["customer_id"]: Customer(
@@ -145,7 +177,7 @@ def _customers() -> dict[str, Customer]:
     }
 
 
-@cache
+@once
 def _accounts() -> tuple[dict[str, Account], dict[str, tuple[Account, ...]]]:
     by_id: dict[str, Account] = {}
     by_customer: dict[str, list[Account]] = {}
@@ -193,7 +225,7 @@ class _TxnIndex:
     reversal_by_original: dict[str, Txn]  # original txn_id -> the Reversal CR row that references it
 
 
-@cache
+@once
 def _txn_index() -> _TxnIndex:
     by_id: dict[str, Txn] = {}
     per_customer: dict[str, list[Txn]] = {}
@@ -255,7 +287,7 @@ def reversal_target(t: Txn) -> str | None:
 # --- ATM journal, fee schedule ---------------------------------------------------------------------
 
 
-@cache
+@once
 def _atm_journal() -> dict[str, AtmJournal]:
     return {
         r["txn_id"]: AtmJournal(
@@ -274,7 +306,7 @@ def atm_journal(txn_id: str) -> AtmJournal | None:
     return _atm_journal().get(txn_id)
 
 
-@cache
+@once
 def fee_schedule() -> tuple[FeeRow, ...]:
     return tuple(
         FeeRow(r["fee_code"], r["fee_name"], r["product"], Decimal(r["amount_myr"]), r["waiver_rule"])
@@ -289,7 +321,7 @@ def _complaint(r: dict[str, str]) -> ComplaintRow:
     return ComplaintRow.model_validate(r)  # pydantic parses received_at and checks the channel
 
 
-@cache
+@once
 def _complaints() -> dict[str, ComplaintRow]:
     out: dict[str, ComplaintRow] = {}
     for r in _rows("complaints.csv"):
@@ -307,7 +339,7 @@ def complaint(complaint_id: str) -> ComplaintRow:
     return _complaints()[complaint_id]
 
 
-@cache
+@once
 def labels() -> dict[str, Label]:
     return {
         r["complaint_id"]: Label(
@@ -324,7 +356,7 @@ def labels() -> dict[str, Label]:
     }
 
 
-@cache
+@once
 def test_ids() -> tuple[str, ...]:
     return tuple(r["complaint_id"] for r in _rows("test_ids.csv"))
 
@@ -332,13 +364,13 @@ def test_ids() -> tuple[str, ...]:
 # --- bank rules ------------------------------------------------------------------------------------
 
 
-@cache
+@once
 def policy_params() -> dict[str, str]:
     """policy_parameters.csv as parameter -> value string (e.g. "AUTO_REFUND_LIMIT_MYR" -> "500.00")."""
     return {r["parameter"]: r["value"] for r in _rows("policy_parameters.csv")}
 
 
-@cache
+@once
 def sla_policy() -> dict[str, SlaRow]:
     return {
         r["priority"]: SlaRow(
@@ -348,7 +380,7 @@ def sla_policy() -> dict[str, SlaRow]:
     }
 
 
-@cache
+@once
 def complaint_policy() -> dict[str, PolicyRow]:
     """Rule text per category, for the decision card."""
     return {
@@ -363,10 +395,19 @@ def complaint_policy() -> dict[str, PolicyRow]:
     }
 
 
+_LOADERS: tuple[once[Any], ...] = (
+    _customers, _accounts, _txn_index, _atm_journal, fee_schedule, _complaints, labels, test_ids,
+    policy_params, sla_policy, complaint_policy,
+)  # fmt: skip
+
+
 def clear_caches() -> None:
     """Drop everything loaded so far (tests that change TERATAI_DATA_DIR)."""
-    for fn in (
-        _customers, _accounts, _txn_index, _atm_journal, fee_schedule, _complaints, labels, test_ids,
-        policy_params, sla_policy, complaint_policy,
-    ):  # fmt: skip
+    for fn in _LOADERS:
         fn.cache_clear()
+
+
+def warm() -> None:
+    """Load every CSV now (API startup), so the first requests don't pay for it. Safe to call twice."""
+    for fn in _LOADERS:
+        fn()

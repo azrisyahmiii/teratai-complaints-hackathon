@@ -64,6 +64,19 @@ def who(facts: FactSheet) -> str:
     return " ".join(p for p in (facts.honorific, facts.customer_name) if p)
 
 
+def scam_help(facts: FactSheet) -> str:
+    """NSRC 997 + police report; when the scam is still in progress, URGENT_SCAM already gave 997."""
+    mod = _LANGS[facts.language]
+    return str(mod.SCAM_HELP_AFTER_URGENT if facts.ids.get("urgent") else mod.SCAM_HELP)
+
+
+def waiver_reason(facts: FactSheet) -> str:
+    """Why no fee was due, in the reply language (FactSheet.ids["waiver"]; an unknown or missing reason says only that)."""
+    reasons = _LANGS[facts.language].WAIVER_REASONS
+    text: str = reasons.get(facts.ids.get("waiver", ""), reasons[""])
+    return text.format(waiver_age=config.DEBIT_FEE_WAIVER_AGE, product=facts.ids.get("product", ""))
+
+
 def context(facts: FactSheet) -> dict[str, str]:
     """Every placeholder a template may use. Keys with no data are absent (the template then falls back to GENERIC)."""
     lg = facts.language
@@ -74,10 +87,13 @@ def context(facts: FactSheet) -> dict[str, str]:
         "sla_days": str(facts.sla_days),
         "update_days": str(config.SCAM_UPDATE_WORKING_DAYS),
         "redress": mod.REDRESS,
-        "scam_help": mod.SCAM_HELP,
+        "redress_bnm": mod.REDRESS_BNM,
+        "scam_help": scam_help(facts),
         "at": "",
         "to": "",
+        "urgent": mod.URGENT_SCAM + " " if facts.ids.get("urgent") else "",
     }
+    ctx["waiver_reason"] = waiver_reason(facts)
     merchant = facts.ids.get("merchant", "")
     if merchant:
         ctx["at"], ctx["to"] = _AT[lg].format(merchant), _TO[lg].format(merchant)
@@ -90,14 +106,28 @@ def context(facts: FactSheet) -> dict[str, str]:
     return ctx
 
 
+def also_noted(facts: FactSheet) -> str:
+    """'We have also noted your question about a fee ...' for the other problems in the complaint; "" when none."""
+    others = [c for c in facts.ids.get("other_issues", "").split(",") if c]
+    if not others:
+        return ""
+    mod = _LANGS[facts.language]
+    joiner = " and " if facts.language == "EN" else " dan "
+    return str(mod.ALSO_NOTED.format(topics=joiner.join(mod.TOPICS[c] for c in others if c in mod.TOPICS)))
+
+
 def render_key(facts: FactSheet, key: str) -> str:
     """Fill the template `key`; if a fact it needs is missing, fall back to the GENERIC text (promises nothing)."""
-    texts = _LANGS[facts.language].TEXTS
+    mod = _LANGS[facts.language]
     ctx = context(facts)
     try:
-        return texts[key].format(**ctx)
+        text = str(mod.TEXTS[key].format(**ctx))
     except KeyError:
-        return texts["GENERIC"].format(**ctx)
+        text = str(mod.TEXTS["GENERIC"].format(**ctx))
+    also = also_noted(facts)
+    if also and text.endswith(mod.CLOSE):
+        text = text[: -len(mod.CLOSE)] + " " + also + mod.CLOSE
+    return text
 
 
 def render(facts: FactSheet) -> str:
