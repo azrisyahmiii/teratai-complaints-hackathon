@@ -11,6 +11,7 @@ import time
 from collections.abc import Callable
 from datetime import date
 from decimal import Decimal
+from difflib import SequenceMatcher
 
 from teratai import classify, config, data, extract, investigate, tools
 from teratai.data import Txn
@@ -106,14 +107,47 @@ def _tokens(s: str) -> set[str]:
     return {w for w in _WORD.findall(s.lower()) if len(w) >= 3}
 
 
+def _squash(s: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", s.lower())
+
+
+def party_similarity(merchant: str, span: str) -> float:
+    """0..1 similarity of a named payee / merchant span to a candidate's merchant.
+
+    1.0 when one contains the other ignoring case, spaces and punctuation ("Go Ride" / GoRide), or they share a
+    significant word. Otherwise the best edit-distance ratio of the whole squash or of a word pair, so a typo
+    ("gamevalt" / GameVault) scores high and an unrelated name low (robustness review §5.1.4).
+    """
+    m, s = _squash(merchant), _squash(span)
+    if not m or not s:
+        return 0.0
+    if (len(s) >= 4 and s in m) or (len(m) >= 4 and m in s):
+        return 1.0
+    mt = {w for w in _tokens(merchant) if w not in _NAME_NOISE}
+    st = {w for w in _tokens(span) if w not in _NAME_NOISE}
+    if mt & st:
+        return 1.0
+    best = SequenceMatcher(None, m, s).ratio()
+    for a in mt:
+        for b in st:
+            if len(a) >= 4 and len(b) >= 4:
+                best = max(best, SequenceMatcher(None, a, b).ratio())
+    return best
+
+
 def counterparty_hit(merchant: str, clue: str | None, text: str) -> bool:
     """Case-insensitive token / substring hit of a candidate's merchant against the clue, else the text.
 
-    `paycoin` is a hit for `PAYCOIN LTD`; `shalini` for `Shalini a/p Nair`. Name particles never count.
+    `paycoin` is a hit for `PAYCOIN LTD`; `shalini` for `Shalini a/p Nair`. Name particles never count. The clue
+    also hits when it is close by edit distance (a typo or different spacing), see `party_similarity`.
     """
     m = merchant.lower().strip()
     if not m:
         return False
+    if clue is not None and not extract.is_name_span(clue):
+        clue = None  # an account phrase or a date word is not a name
+    if clue and party_similarity(merchant, clue) >= config.PARTY_HIT_RATIO:
+        return True
     sources = [clue, text] if clue else [text]
     sig = {w for w in _tokens(m) if w not in _NAME_NOISE}
     for src in sources:
@@ -320,16 +354,21 @@ def _related(txn_id: str, sibling: Txn | None) -> dict[str, str]:
 
 def _named_party(issue: Issue, text: str) -> str | None:
     """The payee / merchant the complaint names: the extractor's verbatim span, else a regex span ("to Ahmad")."""
-    return issue.counterparty or extract.counterparty_span(text)
+    for span in (issue.counterparty, extract.counterparty_span(text)):
+        if extract.is_name_span(span):  # an account phrase / number / date word is never a name
+            return span
+    return None
 
 
 def _party_mismatch(t: Txn, issue: Issue, text: str) -> bool:
-    """The complaint names a payee / merchant and this transaction's counterparty is not it. Only the named
-    span is compared (not the whole text), so one stray word cannot rescue a wrong transaction."""
+    """The complaint names a payee / merchant and this transaction's counterparty is clearly not it. Only the
+    named span is compared (not the whole text), so one stray word cannot rescue a wrong transaction. A soft
+    signal: a typo or different spacing is a hit (+3), a middling similarity is merely not a hit, and only a clear
+    mismatch (similarity < PARTY_VETO_RATIO) vetoes the transaction."""
     if issue.category == "FEE_DISPUTE":
         return False  # a fee has no payee: it is matched on fee type + month
     party = _named_party(issue, text)
-    return bool(party) and not counterparty_hit(t.merchant, party, "")
+    return bool(party) and party_similarity(t.merchant, party) < config.PARTY_VETO_RATIO
 
 
 def _fee_fits(t: Txn, issue: Issue, window: DateWindow, text: str) -> bool:

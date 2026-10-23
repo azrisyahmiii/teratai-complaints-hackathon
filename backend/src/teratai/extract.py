@@ -375,6 +375,32 @@ _NOT_A_PARTY = frozenset(
 )  # fmt: skip
 
 
+# Words that point at an account / card number or a channel, never at a name ("akaun berakhir 1548", "acc hujung 4921").
+_ACCOUNT_WORDS = frozenset(
+    {
+        "akaun", "acc", "acct", "account", "a/c", "kad", "card", "no", "nombor", "number", "hujung", "berakhir",
+        "ending", "end", "in", "with", "ke", "to", "dalam", "di", "kt", "kat", "the", "my", "saya", "sy",
+        "duitnow", "ibg", "atm", "app", "bank", "transfer", "trf", "tf",
+    }
+)  # fmt: skip
+
+
+def is_name_span(span: str | None) -> bool:
+    """A merchant / person name, not an account phrase, a number, a date word or a pronoun.
+
+    "akaun berakhir 1548", "acc 1730", "2109", "Tuesday", "my account" are not names (robustness review §5.1.4).
+    """
+    if not span:
+        return False
+    toks = re.findall(r"[^\W_]+(?:[/'’][^\W_]+)*", span.lower())
+    words = [
+        t for t in toks if not t.isdigit() and t not in _ACCOUNT_WORDS and t not in _NOT_A_PARTY and t not in _MONTHS
+    ]
+    letters = sum(c.isalpha() for c in span)
+    digits = sum(c.isdigit() for c in span)
+    return bool(words) and letters >= 3 and digits < letters
+
+
 def counterparty_span(text: str) -> str | None:
     """The first payee / merchant name the text points at ("to Ahmad Fauzi"), else None."""
     for m in _PARTY.finditer(text):
