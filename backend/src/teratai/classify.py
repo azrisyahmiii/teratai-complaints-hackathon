@@ -22,7 +22,6 @@ import re
 import sys
 import time
 from dataclasses import dataclass
-from functools import cache
 from typing import Any
 
 import joblib
@@ -255,7 +254,7 @@ def train() -> Artifact:
     return art
 
 
-@cache
+@data.once
 def _artifact() -> Artifact:
     """Load the persisted model; train on first use (or when the data or MODEL_VERSION changed)."""
     ids, texts, y = _training_set()
@@ -266,6 +265,12 @@ def _artifact() -> Artifact:
             if isinstance(art, Artifact) and art.fingerprint == _fingerprint(ids, texts, y):
                 return art
     return train()
+
+
+def warm() -> None:
+    """Load the data and the classifier now (API startup), so the first requests don't pay for it."""
+    data.warm()
+    _artifact()
 
 
 def tau() -> float:
