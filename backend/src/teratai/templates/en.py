@@ -27,6 +27,17 @@ URGENT_SCAM = (
     "your TAC or PIN, and call the National Scam Response Centre (NSRC) at 997 immediately."
 )
 SCAM_HELP_AFTER_URGENT = "If advised, please also lodge a police report."  # 997 is already in URGENT_SCAM
+# A complaint with several problems: the reply decides the first and notes the rest (FactSheet.ids["other_issues"]).
+TOPICS = {
+    "DUPLICATE_CHARGE": "duplicate card charge",
+    "FAILED_TRANSFER": "failed transfer",
+    "ATM_NOT_DISPENSED": "ATM cash withdrawal",
+    "UNAUTHORISED_CARD": "disputed card transaction",
+    "SCAM_TRANSFER": "report of a scam transfer",
+    "FEE_DISPUTE": "question about a fee",
+    "SERVICE_QUALITY": "feedback about our service",
+}
+ALSO_NOTED = "We have also noted your {topics}. Our team will look into it and reply to you separately."
 REFUND_TIME = "within {sla_days} working days"
 # Why no fee was due (FactSheet.ids["waiver"], set by reply._fee). A final decision states its reason (BNM).
 WAIVER_REASONS = {

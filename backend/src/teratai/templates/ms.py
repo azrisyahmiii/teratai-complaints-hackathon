@@ -25,6 +25,19 @@ URGENT_SCAM = (
     "dengan segera."
 )
 SCAM_HELP_AFTER_URGENT = "Jika dinasihatkan, sila buat laporan polis juga."
+TOPICS = {
+    "DUPLICATE_CHARGE": "caj kad berganda",
+    "FAILED_TRANSFER": "pemindahan wang yang gagal",
+    "ATM_NOT_DISPENSED": "pengeluaran tunai di ATM",
+    "UNAUTHORISED_CARD": "transaksi kad yang dipertikaikan",
+    "SCAM_TRANSFER": "laporan pemindahan wang akibat penipuan",
+    "FEE_DISPUTE": "pertanyaan mengenai yuran",
+    "SERVICE_QUALITY": "maklum balas tentang perkhidmatan kami",
+}
+ALSO_NOTED = (
+    "Kami juga telah mengambil maklum tentang {topics} yang anda kemukakan. Pasukan kami akan menyemaknya dan memberi "
+    "maklum balas kepada anda secara berasingan."
+)
 REFUND_TIME = "dalam masa {sla_days} hari bekerja"
 WAIVER_REASONS = {
     "age": "Tiada yuran sepatutnya dikenakan ke atas akaun anda kerana yuran tahunan kad debit dikecualikan bagi "

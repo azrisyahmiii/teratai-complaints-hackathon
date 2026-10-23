@@ -14,7 +14,7 @@ import argparse
 import os
 import sys
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import date
 from decimal import Decimal
 from functools import lru_cache
@@ -37,8 +37,17 @@ from teratai.models import (
     StageEvent,
 )
 from teratai.policy import earlier_identical, money
+from teratai.templates import (
+    also_noted,
+    fmt_date,
+    render,
+    scam_help,
+    state_of,
+    template_key,
+    waiver_reason,
+    who,
+)
 from teratai.templates import en as _en
-from teratai.templates import fmt_date, render, scam_help, state_of, template_key, waiver_reason, who
 from teratai.templates import money as fmt_money
 from teratai.templates import ms as _ms
 
@@ -126,14 +135,25 @@ def _state(row: ComplaintRow, m: MatchResult, d: Decision, is_complaint: bool | 
 
 
 def build_facts(
-    row: ComplaintRow, category: Category, m: MatchResult, d: Decision, is_complaint: bool | None = None
+    row: ComplaintRow,
+    category: Category,
+    m: MatchResult,
+    d: Decision,
+    is_complaint: bool | None = None,
+    other_issues: Sequence[Category] = (),
 ) -> FactSheet:
     """`is_complaint` is the pipeline's verdict (`Understanding.is_complaint`: rules and LLM). Left out, the Tier 0
-    rules decide, so a caller that does not pass it still gets the polite acknowledgement for gibberish."""
+    rules decide, so a caller that does not pass it still gets the polite acknowledgement for gibberish.
+
+    `other_issues` = `[i.category for i in u.issues[1:]]`: further problems in the same complaint. The reply notes
+    them ("we will reply separately") and the reply event carries `multi_issue`; nothing is decided for them."""
     language, _reason = reply_language(row)
     cust = data.customer(row.customer_id)
     state = _state(row, m, d, is_complaint)
     ids: Ids = {"state": state}
+    others = [c for c in dict.fromkeys(other_issues) if c != category]
+    if others and state in ("decided", "needs_info"):
+        ids["other_issues"] = ",".join(others)
     if category == "SCAM_TRANSFER" and extract.active_scam(f"{row.subject} {row.text}"):
         ids["urgent"] = "active_scam"  # the scammer may still be on the line: the reply opens with what to do now
     amounts: Amounts = {}
@@ -327,6 +347,8 @@ def fact_sheet_text(facts: FactSheet) -> str:
         lines.append(f"include_verbatim: {mod.REDRESS_BNM}")
     if "{scam_help}" in template:
         lines.append(f"include_verbatim: {scam_help(facts)}")
+    if also_noted(facts):
+        lines.append(f"include_verbatim: {also_noted(facts)}")
     return "\n".join(lines)
 
 
@@ -400,6 +422,7 @@ def _finish(
                 "issues": [i.model_dump() for i in check.issues],
                 "state": state_of(facts),
                 "not_complaint": state_of(facts) == "not_complaint",  # sampling flag (SPEC §6)
+                "multi_issue": bool(facts.ids.get("other_issues")),  # SPEC §5: shown to the officer
                 "drafts": len(drafts),
                 "degraded": False,
                 "check_flagged": False,

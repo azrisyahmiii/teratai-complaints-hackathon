@@ -106,14 +106,28 @@ def context(facts: FactSheet) -> dict[str, str]:
     return ctx
 
 
+def also_noted(facts: FactSheet) -> str:
+    """'We have also noted your question about a fee ...' for the other problems in the complaint; "" when none."""
+    others = [c for c in facts.ids.get("other_issues", "").split(",") if c]
+    if not others:
+        return ""
+    mod = _LANGS[facts.language]
+    joiner = " and " if facts.language == "EN" else " dan "
+    return str(mod.ALSO_NOTED.format(topics=joiner.join(mod.TOPICS[c] for c in others if c in mod.TOPICS)))
+
+
 def render_key(facts: FactSheet, key: str) -> str:
     """Fill the template `key`; if a fact it needs is missing, fall back to the GENERIC text (promises nothing)."""
-    texts = _LANGS[facts.language].TEXTS
+    mod = _LANGS[facts.language]
     ctx = context(facts)
     try:
-        return texts[key].format(**ctx)
+        text = str(mod.TEXTS[key].format(**ctx))
     except KeyError:
-        return texts["GENERIC"].format(**ctx)
+        text = str(mod.TEXTS["GENERIC"].format(**ctx))
+    also = also_noted(facts)
+    if also and text.endswith(mod.CLOSE):
+        text = text[: -len(mod.CLOSE)] + " " + also + mod.CLOSE
+    return text
 
 
 def render(facts: FactSheet) -> str:

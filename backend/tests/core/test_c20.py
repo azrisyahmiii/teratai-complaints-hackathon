@@ -239,3 +239,46 @@ def test_past_scam_reply_is_unchanged() -> None:
     d = process_complaint(data.complaint(_first("SCAM_TRANSFER", "INVESTIGATE", "EN")), "eval")
     assert "urgent" not in d.facts.ids
     assert en.URGENT_SCAM not in d.reply_text and en.SCAM_HELP in d.reply_text
+
+
+# --- §9 #5c: a second problem in the same complaint is noted, never silently dropped (SPEC §5) ----------------------
+def test_classify_keeps_the_llms_further_issues(monkeypatch: pytest.MonkeyPatch) -> None:
+    from teratai import classify, data
+    from tests.core.test_c18_llm_first import _detail
+
+    two = extract.LLMExtraction(
+        issues=[Issue(category="DUPLICATE_CHARGE"), Issue(category="FEE_DISPUTE"), Issue(category="DUPLICATE_CHARGE")],
+        language="EN", is_complaint=True, injection_suspected=False, attempts=1, details=(_detail(),) * 3,
+    )  # fmt: skip
+    monkeypatch.setenv("EXTRACT_MODE", "llm")
+    monkeypatch.setattr(classify, "_llm_extract", lambda *_a, **_k: two)
+    events: list[StageEvent] = []
+    u = classify.understand(data.complaint("CMP-00165"), "batch", events.append)
+    assert [i.category for i in u.issues] == ["DUPLICATE_CHARGE", "FEE_DISPUTE"]  # the repeat is dropped
+    assert next(e for e in events if e.stage == "understand").payload["other_issues"] == ["FEE_DISPUTE"]
+
+
+@pytest.mark.parametrize("language, cue", [("EN", "question about a fee"), ("MS", "pertanyaan mengenai yuran")])
+def test_other_issues_are_noted_in_the_reply(language: str, cue: str) -> None:
+    from teratai import data, reply
+
+    d = process_complaint(data.complaint(_first("DUPLICATE_CHARGE", "REFUND", language)), "eval")
+    facts = reply.build_facts(
+        data.complaint(d.complaint_id), d.category, d.match, d.decision, None, ["FEE_DISPUTE", "DUPLICATE_CHARGE"]
+    )
+    assert facts.ids["other_issues"] == "FEE_DISPUTE"  # the primary category is never "another" issue
+    events: list[StageEvent] = []
+    r = reply.write_reply(facts, "batch", events.append)
+    body = r.text.split("\n\n")[1]
+    assert cue in body and body.endswith(".") and r.check.ok
+    assert cue in reply.fact_sheet_text(facts)
+    assert [e for e in events if e.stage == "reply"][-1].payload["multi_issue"] is True
+
+
+def test_single_issue_reply_has_no_note() -> None:
+    from teratai import data
+
+    events: list[StageEvent] = []
+    d = process_complaint(data.complaint("CMP-00165"), "eval", events.append)
+    assert "other_issues" not in d.facts.ids and "separately" not in d.reply_text
+    assert [e for e in events if e.stage == "reply"][-1].payload["multi_issue"] is False
