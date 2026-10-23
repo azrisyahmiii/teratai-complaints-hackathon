@@ -1,12 +1,25 @@
 """FastAPI app. P4a minimal: health + stub intake and case reads so the OpenAPI types exist; P1 replaces the stubs."""
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException
 
 from teratai import pipeline
+from teratai.api import routes_agent, worker
 from teratai.api.schemas import CaseCreated, CaseDetail, CaseSummary
 from teratai.models import ComplaintRow
 
-app = FastAPI(title="Teratai complaints agent")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    worker.warm_up()
+    yield
+    worker.shutdown()
+
+
+app = FastAPI(title="Teratai complaints agent", lifespan=lifespan)
+app.include_router(routes_agent.router)
 
 
 @app.get("/api/health")
