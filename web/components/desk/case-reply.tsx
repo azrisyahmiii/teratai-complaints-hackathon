@@ -97,14 +97,13 @@ export function ReplyPanel({
   const [editing, setEditingRaw] = useState(false)
   const [draft, setDraft] = useState("")
   const [check, setCheck] = useState<Check | null>(null)
-  const [name, setName] = useState<string | null>(null)
   const [reason, setReason] = useState("")
   const [confirm, setConfirm] = useState<Confirm>(null)
   const [busy, setBusy] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
 
-  const actor = (name ?? defaultName).trim()
-  const awaiting = detail.case.case_state === "awaiting_approval"
+  const actor = defaultName
+  const awaiting = detail.case.case_state === "awaiting_approval" && detail.can_act
   const caseFlagged = detail.case.self_check === "flagged"
   const customer = detail.case.customer_name
   const outcome = str(detail.decision?.outcome) ?? detail.case.outcome
@@ -166,12 +165,11 @@ export function ReplyPanel({
     setBusy(true)
     setErrors([])
     try {
-      const res = await fetch(`/agent/cases/${encodeURIComponent(id)}/actions`, {
+      const res = await fetch(`/api/cases/${encodeURIComponent(id)}/actions`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-Requested-With": "teratai" },
         body: JSON.stringify({
           action,
-          actor,
           ...(reason.trim() ? { reason: reason.trim() } : {}),
           ...(action === "edit_approve" ? { reply_text: draft } : {}),
         }),
@@ -267,6 +265,11 @@ export function ReplyPanel({
       </div>
 
       <div className="flex flex-col gap-3 border-t p-4">
+        {detail.case.case_state === "awaiting_approval" && !detail.can_act && (
+          <p className="rounded-md border border-status-warning-border bg-status-warning-bg p-3 text-[13px] text-status-warning-fg">
+            {detail.action_block_reason ?? "This case is awaiting an authorised reviewer."}
+          </p>
+        )}
         {closed && <p className="text-[13px]">{closed}</p>}
         {awaiting && (
           <>
@@ -275,7 +278,7 @@ export function ReplyPanel({
                 <Label htmlFor="approver-name" className="text-xs font-medium text-muted-foreground">
                   Your name
                 </Label>
-                <Input id="approver-name" value={name ?? defaultName} onChange={(e) => setName(e.target.value)} />
+                <Input id="approver-name" value={actor} readOnly />
               </div>
               <div className="flex min-w-[200px] flex-[2] flex-col gap-1">
                 <Label htmlFor="approver-reason" className="text-xs font-medium text-muted-foreground">

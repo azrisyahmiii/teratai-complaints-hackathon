@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useRef, useState } from "react"
+import { ArrowUpRight, Inbox } from "lucide-react"
 
 import { Money } from "@/components/desk/money"
 import { MonoId } from "@/components/desk/mono-id"
@@ -175,34 +176,52 @@ export function Queues() {
   const figs = data ? figuresFor(role, data, rows) : null
 
   return (
-    <div className="flex max-w-[1180px] flex-col gap-4 p-6">
+    <div className="workspace-content flex flex-col">
+      <section className="queue-intro" aria-labelledby="queue-intro-title">
+        <div>
+          <p className="eyebrow">Care, with clarity</p>
+          <h2 id="queue-intro-title">Every concern deserves care.</h2>
+          <p>Review the evidence. Make a considered decision.<br />Help your next customer move forward.</p>
+        </div>
+        <Link href="/intake" className="queue-intro-action">New complaint <ArrowUpRight aria-hidden className="size-4" /></Link>
+      </section>
       {figs && (
         <section
           aria-label="Figures"
-          className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] overflow-hidden rounded-md border bg-card"
+          className="queue-figures"
         >
           {figs.map((f) => (
-            <div key={f.label} className="min-w-0 border-r px-4 py-3 last:border-r-0">
+            <div key={f.label} className="queue-figure">
               <div className="text-xs font-medium text-muted-foreground">{f.label}</div>
-              <div className={cn("mt-0.5 text-xl font-semibold tabular-nums", f.red && "text-status-critical-fg")}>
+              <div className={cn("queue-figure-value", f.red && "text-status-critical-fg")}>
                 {f.value}
               </div>
-              <div className="mt-0.5 truncate text-xs text-muted-foreground">{f.sub}</div>
+              <div className="mt-2 text-xs leading-relaxed text-muted-foreground">{f.sub}</div>
             </div>
           ))}
         </section>
       )}
 
-      <section className="rounded-md border bg-card">
+      <section className="queue-register rounded-md border bg-card" aria-labelledby="register-title">
+        <div className="register-heading">
+          <div>
+            <h2 id="register-title" className="text-base font-semibold">Case register</h2>
+            <p className="mt-1 text-xs text-muted-foreground">Prioritised for your next decision.</p>
+          </div>
+          <span role="status" className={cn("feed-status", failed ? "is-offline" : !data && "is-loading")}>
+            <span className="feed-dot" aria-hidden />
+            {failed ? "Connection interrupted" : data ? "Updated every 2 s" : "Connecting…"}
+          </span>
+        </div>
         <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)}>
           <TabsList variant="line" className="group-data-horizontal/tabs:h-auto w-full flex-wrap justify-start gap-1 rounded-none border-b px-3 py-0">
-            {TABS.map((t) => (
+            {TABS.filter((t) => role === "manager" || (role === "fraud" ? ["with_fraud_team", "all"].includes(t.key) : t.key !== "with_fraud_team")).map((t) => (
               <TabsTrigger
                 key={t.key}
                 value={t.key}
                 className="h-auto flex-none rounded-none border-0 border-b-2 border-transparent px-3 py-2.5 text-sm text-muted-foreground after:hidden data-active:border-primary data-active:font-medium data-active:text-foreground"
               >
-                {t.label}
+                {t.key === "all" && role !== "manager" ? "All my team's cases" : t.label}
                 <span className="rounded-[4px] bg-muted px-1.5 text-xs font-normal text-muted-foreground tabular-nums">
                   {data?.counts[t.key] ?? 0}
                 </span>
@@ -265,7 +284,7 @@ export function Queues() {
         </Table>
 
         {data && shown.length === 0 && (
-          <p className="border-t px-3 py-8 text-center text-[13px] text-muted-foreground">{EMPTY[tab]}</p>
+          <div className="empty-queue"><Inbox aria-hidden /><p className="text-[13px] text-muted-foreground">{EMPTY[tab]}</p></div>
         )}
         {!data && !failed && <p className="border-t px-3 py-8 text-center text-[13px] text-muted-foreground">Loading cases…</p>}
 

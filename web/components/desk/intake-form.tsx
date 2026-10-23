@@ -88,6 +88,7 @@ export function IntakeForm() {
   const [sent, setSent] = useState<Sent | null>(null)
   const [detail, setDetail] = useState<Detail | null>(null)
   const [apiError, setApiError] = useState<string | null>(null)
+  const [routedAway, setRoutedAway] = useState(false)
   const [recent, setRecent] = useState<Recent[]>([])
 
   const parsed = useMemo(() => (raw.trim() === "" ? null : parseComplaintRow(raw)), [raw])
@@ -96,12 +97,13 @@ export function IntakeForm() {
   async function send(fields: ComplaintFields) {
     setSending(true)
     setApiError(null)
+    setRoutedAway(false)
     setSent(null)
     setDetail(null)
     try {
-      const res = await fetch("/agent/complaints", {
+      const res = await fetch("/api/complaints", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-Requested-With": "teratai" },
         body: JSON.stringify(fields),
       })
       const body: unknown = await res.json().catch(() => ({}))
@@ -122,7 +124,7 @@ export function IntakeForm() {
   }
 
   const sentId = sent?.id
-  const finished = detail?.case.status === "done" || detail?.case.status === "error"
+  const finished = routedAway || detail?.case.status === "done" || detail?.case.status === "error"
 
   useEffect(() => {
     if (!sentId) return
@@ -132,8 +134,13 @@ export function IntakeForm() {
     async function poll() {
       let done = false
       try {
-        const { data } = await api.GET("/api/cases/{complaint_id}", { params: { path: { complaint_id: sentId! } } })
+        const { data, response } = await api.GET("/api/cases/{complaint_id}", { params: { path: { complaint_id: sentId! } } })
         if (!alive) return
+        if (response.status === 403) {
+          setApiError("This complaint has been routed to another team. Only that team and the manager can review it.")
+          setRoutedAway(true)
+          return
+        }
         if (data) {
           setDetail(data)
           const st = data.case.status === "done" ? (data.case.case_state ?? "done") : data.case.status
@@ -157,28 +164,29 @@ export function IntakeForm() {
   const c = detail?.case
 
   return (
-    <div className="flex max-w-[1180px] flex-wrap items-start gap-4 p-6">
+    <div className="workspace-content flex flex-wrap items-start">
       <section className="min-w-0 flex-[1_1_440px] rounded-md border bg-card">
-        <h2 className="border-b px-4 py-3 text-base font-semibold">Paste a complaints.csv row or JSON</h2>
+        <h2 className="border-b px-4 py-3 text-base font-semibold">Complaint details</h2>
         <div className="flex flex-col gap-3 p-4">
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-muted-foreground">Row as given (header optional)</span>
+            <span className="text-xs font-medium text-muted-foreground">Paste a CSV row or JSON (header optional)</span>
             <Textarea
               value={raw}
               onChange={(e) => setRaw(e.target.value)}
               spellCheck={false}
-              className="min-h-[140px] bg-card font-mono text-[12.5px] leading-normal"
+              className="min-h-[200px] bg-card font-mono text-[12.5px] leading-relaxed"
+              placeholder="Paste the complaint here…"
             />
           </label>
           <p className="text-xs text-muted-foreground">
-            Paste it exactly as the judge gives it. Quoted text with commas and line breaks is fine.
+            Include the complaint ID, customer ID, received time, channel, subject and text. Quoted commas and line breaks are supported.
           </p>
           <div className="flex flex-wrap gap-2">
             <Button disabled={!canSend} onClick={() => parsed?.ok && void send(parsed.fields)}>
               {sending ? "Sending…" : "Send to the agent"}
             </Button>
             <Button variant="secondary" onClick={() => setRaw(README_EXAMPLE)}>
-              Paste the README example
+              Load example
             </Button>
           </div>
         </div>
@@ -228,7 +236,7 @@ export function IntakeForm() {
             <h2 className="flex flex-wrap items-center gap-2 border-b px-4 py-3 text-base font-semibold">
               <MonoId className="text-base">{sent.id}</MonoId>
               <span aria-hidden>·</span>
-              <StatusBadge value={stateOf(detail)} />
+              <StatusBadge value={routedAway ? "Routed to another team" : stateOf(detail)} />
             </h2>
             <div className="flex flex-col gap-1 px-4 py-3">
               {sent.existing && (

@@ -1,5 +1,28 @@
 # DESIGN: how the Teratai complaints desk looks and reads
 
+## Current visual direction (2026-10-23)
+
+The requested lotus-bank theme for the frontend redesign supersedes the original visual tokens below.
+The working screens retain their human approval confirmations and self-checks behind authenticated staff APIs.
+Use forest green `#123D30` for navigation, warm ivory `#F5F3EE` for the workspace, pale stone panels
+`#FFFEFB`, champagne gold for restrained identity details, and the existing berry `#8A1F5C` for actions.
+Keep semantic status colours and labels distinct. IBM Plex remains the working font; a restrained serif
+appears only in the queue introduction and sidebar brand message. Use the generated lotus pavilion
+(`web/public/images/teratai-pavilion.webp`) as contextual imagery, never behind case evidence or reply text.
+Motion is a short page entrance and control/row transitions, disabled for reduced-motion preferences.
+On small screens the sidebar becomes a compact navigation bar; wide evidence tables scroll within their panels.
+The top-right staff bar shows the signed-in ID, role and logout. There is no role selector;
+the server scopes every staff read and action. See [AUTH.md](AUTH.md) for accounts and access rules.
+
+Image provenance: generated with the built-in ImageGen tool, then resized to a 1600px WebP (245 KB)
+with the existing Sharp dependency. Prompt: "Photorealistic architectural photograph of a lotus-inspired
+Malaysian bank pavilion in pale travertine, glass and brass, overlooking a calm reflecting pool with
+lotus flowers, tropical greenery and a subtle Kuala Lumpur skyline at sunrise. Warm champagne gold
+light and forest green shadows; building on the right, dark negative space on the left. No text,
+logos, money or UI." No new runtime dependencies are required.
+
+The original specification below is retained as context; current CSS variables are the source of truth for colour and radius.
+
 Read this before building or changing any screen in `web/`. It applies to every role (officer, fraud analyst, manager)
 and to the demo screens. The audience is a bank's back office: people who process dozens of cases a shift and must be
 able to defend every decision. The design should feel like a well-run banking system, not a startup landing page.

@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 
 from .conftest import complaint, wait_done
@@ -5,6 +6,12 @@ from .conftest import complaint, wait_done
 # CMP-00244: ATM shortfall, refund 550.00 → awaiting approval. CMP-00165: duplicate 46.66 → auto-resolved.
 # CMP-00387: 3DS-OTP card payment → with fraud team, P1, received 23 Sep (ack overdue on the 30 Sep clock).
 CASES = ("CMP-00244", "CMP-00165", "CMP-00387")
+
+
+@pytest.fixture(autouse=True)
+def _staff_session(client: TestClient) -> None:
+    client.headers.update({"X-Requested-With": "teratai"})
+    assert client.post("/api/auth/login", json={"username": "asyraf", "password": "000000"}).status_code == 200
 
 
 def _load(client: TestClient) -> None:

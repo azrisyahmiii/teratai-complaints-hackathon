@@ -3,14 +3,15 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Suspense } from "react"
+import { Inbox, Leaf, MailCheck, Plus } from "lucide-react"
 
-import { ROLES, useRole } from "@/lib/role"
 import { cn } from "cn"
+import { LotusMark } from "./lotus-mark"
 
 const NAV = [
-  { href: "/queues", label: "Queues" },
-  { href: "/intake", label: "New complaint" },
-  { href: "/outbox", label: "Outbox" },
+  { href: "/queues", label: "Queues", icon: Inbox },
+  { href: "/intake", label: "New complaint", icon: Plus },
+  { href: "/outbox", label: "Outbox", icon: MailCheck },
 ]
 
 function ActiveNav() {
@@ -28,11 +29,13 @@ function NavLinks({ pathname }: { pathname: string }) {
             href={n.href}
             aria-current={on ? "page" : undefined}
             className={cn(
-              "rounded-md px-2.5 py-2 text-sm no-underline hover:bg-background",
-              on && "bg-accent font-medium text-accent-foreground hover:bg-accent",
+              "desk-nav-link",
+              on && "is-active",
             )}
           >
+            <n.icon className="size-[18px] shrink-0" aria-hidden />
             {n.label}
+            {on && <span className="nav-active-dot" aria-hidden />}
           </Link>
         )
       })}
@@ -41,46 +44,27 @@ function NavLinks({ pathname }: { pathname: string }) {
 }
 
 export function Sidebar() {
-  const { role, setRole } = useRole()
   return (
     <nav
       aria-label="Main"
-      className="flex shrink-0 flex-col gap-0.5 border-b bg-card px-3 py-4 md:sticky md:top-0 md:h-screen md:w-[232px] md:border-r md:border-b-0"
+      className="desk-sidebar"
     >
-      <div className="flex items-center gap-2.5 px-2.5 pt-1 pb-4">
-        <span className="flex size-7 items-center justify-center rounded-md bg-primary font-semibold text-primary-foreground">
-          T
-        </span>
+      <Link href="/queues" className="desk-brand" aria-label="Teratai Bank complaints desk">
+        <LotusMark className="size-11 shrink-0 text-[#DCBD83]" />
         <div>
-          <div className="font-semibold">Teratai Bank</div>
-          <div className="text-xs text-muted-foreground">Complaints desk</div>
+          <div className="text-[15px] font-medium tracking-[0.12em]">TERATAI BANK</div>
+          <div className="mt-1 text-[10px] tracking-[0.18em] text-[#BAC9BF]">COMPLAINTS PLATFORM</div>
         </div>
-      </div>
+      </Link>
+      <p className="sidebar-section-label">Workspace</p>
       {/* usePathname is runtime data on dynamic routes: it must sit under Suspense (cacheComponents). */}
       <Suspense fallback={<NavLinks pathname="" />}>
         <ActiveNav />
       </Suspense>
-      <div className="mt-auto border-t px-2.5 pt-3">
-        <div className="mb-1.5 text-xs font-medium text-muted-foreground" id="viewing-as">
-          Viewing as
-        </div>
-        <div className="flex flex-col gap-1" role="group" aria-labelledby="viewing-as">
-          {ROLES.map((r) => (
-            <button
-              key={r.key}
-              type="button"
-              aria-pressed={role === r.key}
-              onClick={() => setRole(r.key)}
-              className={cn(
-                "cursor-pointer rounded-md border bg-card px-2.5 py-1.5 text-left text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                role === r.key && "border-primary bg-accent font-medium text-accent-foreground",
-              )}
-            >
-              {r.label}
-            </button>
-          ))}
-        </div>
-        <p className="mt-2 text-xs text-muted-foreground">No sign-in. Approvals record the name you type.</p>
+      <div className="sidebar-story" aria-hidden="true">
+        <Leaf className="mb-2 size-4 text-[#DCBD83]" />
+        <p>Every concern<br />deserves care.</p>
+        <span>The Teratai way.</span>
       </div>
     </nav>
   )

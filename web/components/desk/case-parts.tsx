@@ -15,7 +15,7 @@ export function CaseHeader({ id, detail }: { id: string; detail: CaseDetail | nu
   const c = detail?.case
   const done = c?.status === "done"
   return (
-    <header className="flex flex-col gap-2 border-b bg-card px-6 py-3">
+    <header className="workspace-header !flex-col !items-start">
       <nav aria-label="Breadcrumb" className="text-[13px] text-muted-foreground">
         <Link href="/queues" className="text-primary hover:underline">
           Queues

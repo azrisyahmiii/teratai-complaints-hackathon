@@ -6,12 +6,13 @@ from fastapi import APIRouter, Query
 from fastapi.responses import Response
 
 from teratai import export
+from teratai.api.auth import Manager
 
 router = APIRouter()
 
 
 @router.get("/api/export/predictions")
-def predictions(run_id: str = Query(...)) -> Response:
+def predictions(user: Manager, run_id: str = Query(...)) -> Response:
     buf = io.StringIO()
     n = export.write_csv(run_id, buf)
     return Response(

@@ -16,7 +16,7 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS cases(
   complaint_id TEXT NOT NULL, run_id TEXT NOT NULL, row JSON, status TEXT NOT NULL, error TEXT,
   agent_decision JSON, flags JSON, case_state TEXT, sent INTEGER, human_action JSON,
-  created_at TEXT, updated_at TEXT, PRIMARY KEY(run_id, complaint_id));
+  created_at TEXT, updated_at TEXT, submitted_by TEXT, PRIMARY KEY(run_id, complaint_id));
 CREATE TABLE IF NOT EXISTS case_events(
   id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT, complaint_id TEXT, ts TEXT, actor TEXT, action TEXT,
   stage TEXT, payload JSON, model TEXT, tokens_in INTEGER, tokens_out INTEGER, cost_usd TEXT,
@@ -31,6 +31,10 @@ CREATE TABLE IF NOT EXISTS users(
 CREATE TABLE IF NOT EXISTS alerts(
   id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, kind TEXT, run_id TEXT, complaint_id TEXT, message TEXT,
   seen INTEGER DEFAULT 0);
+CREATE TABLE IF NOT EXISTS sessions(
+  token_hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL, expires_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS login_attempts(
+  username TEXT NOT NULL, source TEXT NOT NULL, at INTEGER NOT NULL);
 """
 
 _ready: set[str] = set()
@@ -55,6 +59,9 @@ def connect() -> Iterator[sqlite3.Connection]:
                 if key not in _ready:
                     con.execute("PRAGMA journal_mode=WAL")
                     con.executescript(SCHEMA)
+                    columns = {r["name"] for r in con.execute("PRAGMA table_info(cases)")}
+                    if "submitted_by" not in columns:
+                        con.execute("ALTER TABLE cases ADD COLUMN submitted_by TEXT")
                     _ready.add(key)
         yield con
     finally:
@@ -74,14 +81,14 @@ def get_case(run_id: str, complaint_id: str) -> sqlite3.Row | None:
         return row
 
 
-def insert_processing(run_id: str, complaint_id: str, row_json: str) -> bool:
+def insert_processing(run_id: str, complaint_id: str, row_json: str, submitted_by: str | None = None) -> bool:
     """True if inserted, False if the case already existed (atomic)."""
     t = now()
     with connect() as con:
         cur = con.execute(
-            "INSERT OR IGNORE INTO cases(complaint_id, run_id, row, status, created_at, updated_at) "
-            "VALUES(?,?,?,?,?,?)",
-            (complaint_id, run_id, row_json, "processing", t, t),
+            "INSERT OR IGNORE INTO cases(complaint_id, run_id, row, status, created_at, updated_at, submitted_by) "
+            "VALUES(?,?,?,?,?,?,?)",
+            (complaint_id, run_id, row_json, "processing", t, t, submitted_by),
         )
         return cur.rowcount == 1
 

@@ -1,11 +1,17 @@
-export function PageHeader({ title }: { title: string }) {
+import { Clock3 } from "lucide-react"
+
+export function PageHeader({ title, description }: { title: string; description?: string }) {
   return (
-    <header className="flex flex-wrap items-center gap-3 border-b bg-card px-6 py-3">
-      <h1 className="text-xl font-semibold">{title}</h1>
-      <span className="inline-flex h-[22px] items-center rounded-[4px] border border-status-success-border bg-status-success-bg px-1.5 text-xs font-medium text-status-success-fg">
-        Live
-      </span>
-      <span className="ml-auto text-[13px] text-muted-foreground">Updates every 2 s · times in MYT</span>
+    <header className="workspace-header">
+      <div>
+        <p className="eyebrow">Complaints workspace</p>
+        <h1 className="mt-1 text-xl font-semibold tracking-tight">{title}</h1>
+        {description && <p className="mt-1 text-[13px] text-muted-foreground">{description}</p>}
+      </div>
+      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+        <span className="flex items-center gap-1.5"><Clock3 aria-hidden className="size-3.5" />Malaysia time</span>
+        <span className="rounded-full border bg-card px-2.5 py-1">MYT · UTC+8</span>
+      </div>
     </header>
   )
 }

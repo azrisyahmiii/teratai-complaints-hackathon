@@ -1,4 +1,4 @@
-"""Read API for our web UI (queues, case page, outbox). Writes go through the organisers' /cases/{id}/actions."""
+"""Authenticated staff API. Role-scoped reads; actions reuse the organiser workflow with session identity."""
 
 import json
 import sqlite3
@@ -7,10 +7,12 @@ from decimal import Decimal
 from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from teratai import check, data, db, settings
-from teratai.api import states
+from teratai.api import auth, intake, routes_agent, states
+from teratai.api.auth import MutationUser, User
 from teratai.api.routes_agent import money
 from teratai.check import TokenVerdict
 from teratai.models import AgentDecision, CheckIssue, ComplaintRow, FactSheet
@@ -150,6 +152,8 @@ class CaseDetail(BaseModel):
     tokens: list[TokenVerdict] = []
     events: list[EventView] = []
     outbox: list[OutboxItem] = []
+    can_act: bool = False
+    action_block_reason: str | None = None
 
 
 class CheckIn(BaseModel):
@@ -238,10 +242,12 @@ def _figures(rows: list[CaseRow], now: datetime) -> Figures:
 
 
 @router.get("/cases")
-def list_cases(state: str | None = None, run_id: str = db.LIVE) -> CaseList:
+def list_cases(user: User, state: str | None = None, run_id: str = db.LIVE) -> CaseList:
     """Every case in the run, sorted by priority then received time; `state` filters items, never counts or figures."""
+    auth.require_run(user, run_id)
+    clause, params = auth.case_scope(user)
     with db.connect() as con:
-        rs = con.execute("SELECT * FROM cases WHERE run_id=?", (run_id,)).fetchall()
+        rs = con.execute(f"SELECT c.* FROM cases c WHERE c.run_id=? AND ({clause})", (run_id, *params)).fetchall()
     rows = sorted((_row(r)[0] for r in rs), key=_sort_key)
     counts = {"all": len(rows)}
     for c in rows:
@@ -290,10 +296,8 @@ def _outbox_items(rs: list[sqlite3.Row], names: dict[str, str]) -> list[OutboxIt
 
 
 @router.get("/cases/{complaint_id}")
-def get_case_detail(complaint_id: str, run_id: str = db.LIVE) -> CaseDetail:
-    r = db.get_case(run_id, complaint_id)
-    if r is None:
-        raise HTTPException(404, detail=f"case {complaint_id} not found")
+def get_case_detail(complaint_id: str, user: User, run_id: str = db.LIVE) -> CaseDetail:
+    r = auth.require_case(user, run_id, complaint_id)
     row, ad = _row(r)
     complaint = ComplaintRow.model_validate_json(r["row"])
     with db.connect() as con:
@@ -317,6 +321,8 @@ def get_case_detail(complaint_id: str, run_id: str = db.LIVE) -> CaseDetail:
         customer_preferred_language=pref,
         human_action=json.loads(r["human_action"]) if r["human_action"] else None,
         events=events, outbox=_outbox_items(obx, {complaint_id: row.customer_name}),
+        can_act=row.case_state == states.AWAITING and auth.action_block_reason(user, r) is None,
+        action_block_reason=auth.action_block_reason(user, r),
     )
     if ad is None:
         return detail
@@ -342,11 +348,9 @@ def get_case_detail(complaint_id: str, run_id: str = db.LIVE) -> CaseDetail:
 
 
 @router.post("/cases/{complaint_id}/check-reply")
-def check_reply(complaint_id: str, body: CheckIn, run_id: str = db.LIVE) -> CheckOut:
+def check_reply(complaint_id: str, body: CheckIn, user: MutationUser, run_id: str = db.LIVE) -> CheckOut:
     """Dry-run the self-check on an edited reply. Changes nothing; approving still goes through /actions."""
-    r = db.get_case(run_id, complaint_id)
-    if r is None:
-        raise HTTPException(404, detail=f"case {complaint_id} not found")
+    r = auth.require_case(user, run_id, complaint_id)
     if r["status"] != "done":
         raise HTTPException(409, detail=f"case is still {r['status']}")
     facts = FactSheet.model_validate(json.loads(r["agent_decision"])["facts"])
@@ -357,10 +361,42 @@ def check_reply(complaint_id: str, body: CheckIn, run_id: str = db.LIVE) -> Chec
 
 
 @router.get("/outbox")
-def list_outbox(run_id: str = db.LIVE) -> list[OutboxItem]:
+def list_outbox(user: User, run_id: str = db.LIVE) -> list[OutboxItem]:
     """Simulated replies sent to customers, newest first."""
+    auth.require_run(user, run_id)
+    clause, params = auth.case_scope(user)
     with db.connect() as con:
-        rs = con.execute("SELECT * FROM outbox WHERE run_id=? ORDER BY id DESC", (run_id,)).fetchall()
-        cust = con.execute("SELECT complaint_id, row FROM cases WHERE run_id=?", (run_id,)).fetchall()
-    names = {c["complaint_id"]: _name(ComplaintRow.model_validate_json(c["row"]).customer_id) for c in cust}
+        rs = con.execute(
+            "SELECT o.*, c.row AS complaint_row FROM outbox o JOIN cases c "
+            "ON c.run_id=o.run_id AND c.complaint_id=o.complaint_id "
+            f"WHERE c.run_id=? AND ({clause}) ORDER BY o.id DESC", (run_id, *params),
+        ).fetchall()
+    names = {r["complaint_id"]: _name(ComplaintRow.model_validate_json(r["complaint_row"]).customer_id) for r in rs}
     return _outbox_items(rs, names)
+
+
+@router.post("/complaints", status_code=202)
+def post_staff_complaint(body: intake.ComplaintIn, user: MutationUser) -> JSONResponse:
+    existing = db.get_case(db.LIVE, body.complaint_id.strip())
+    if existing is not None:
+        auth.require_case(user, db.LIVE, body.complaint_id.strip())
+    return routes_agent.create_complaint(body, submitted_by=user.username)
+
+
+class StaffActionIn(BaseModel):
+    action: Literal["approve", "reject", "edit_approve"]
+    reason: str = ""
+    reply_text: str | None = None
+
+
+@router.post("/cases/{complaint_id}/actions")
+def post_staff_action(complaint_id: str, body: StaffActionIn, user: MutationUser) -> dict[str, Any]:
+    row = auth.require_case(user, db.LIVE, complaint_id)
+    reason = auth.action_block_reason(user, row)
+    if reason:
+        raise HTTPException(403, detail=reason)
+    if body.action == "approve" and row["agent_decision"] and not json.loads(row["agent_decision"])["check_ok"]:
+        raise HTTPException(422, detail="The reply must pass the self-check before approval.")
+    return routes_agent.post_action(complaint_id, routes_agent.ActionIn(
+        action=body.action, actor=user.username, reason=body.reason, reply_text=body.reply_text,
+    ))

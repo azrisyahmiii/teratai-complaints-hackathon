@@ -43,7 +43,7 @@ export function OutboxList() {
   const current = rows.find((r) => r.id === pickedId) ?? rows[0]
 
   return (
-    <div className="flex max-w-[1180px] flex-col gap-3 p-6">
+    <div className="workspace-content flex flex-col">
       {failed && (
         <p role="status" className="text-[13px] text-status-critical-fg">
           Can&apos;t reach the API. Retrying every 2 s.
@@ -78,7 +78,9 @@ export function OutboxList() {
                     className={cn("h-10 cursor-pointer hover:bg-accent", r.id === current.id && "bg-accent")}
                   >
                     <TableCell className="px-3 py-0">
-                      <DateTime value={r.ts} short />
+                      <button type="button" onClick={() => setPickedId(r.id)} aria-pressed={r.id === current.id} aria-label={`Read reply for ${r.complaint_id}`} className="cursor-pointer rounded-sm text-left hover:text-primary">
+                        <DateTime value={r.ts} short />
+                      </button>
                     </TableCell>
                     <TableCell className="px-3 py-0">
                       <MonoId>{r.complaint_id}</MonoId>

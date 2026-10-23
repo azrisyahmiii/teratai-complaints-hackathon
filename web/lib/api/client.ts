@@ -6,7 +6,12 @@ import type { components, paths } from "./schema"
 // Server components need an absolute URL, so they call API_URL directly.
 const baseUrl = typeof window === "undefined" ? (process.env.API_URL ?? "http://localhost:8000") : ""
 
-export const api = createClient<paths>({ baseUrl })
+export const api = createClient<paths>({ baseUrl, cache: "no-store", headers: { "X-Requested-With": "teratai" } })
+api.use({
+  onResponse({ response }) {
+    if (response.status === 401 && typeof window !== "undefined") window.location.replace("/login")
+  },
+})
 
 // Money fields are strings ("46.66"): display them, never parseFloat them for maths.
 export type Schemas = components["schemas"]

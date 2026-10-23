@@ -5,6 +5,9 @@ import { Shell } from "@/components/desk/shell"
 
 import "./globals.css"
 
+// Staff content is withheld until a live session is verified, so it cannot validate as instant navigation.
+export const instant = false
+
 const plexSans = IBM_Plex_Sans({
   variable: "--font-plex-sans",
   subsets: ["latin"],

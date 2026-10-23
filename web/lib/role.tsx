@@ -1,64 +1,73 @@
 "use client"
 
-import { createContext, useCallback, useContext, useMemo, useSyncExternalStore } from "react"
+import { createContext, useCallback, useContext, useEffect, useState } from "react"
+import type { Schemas } from "@/lib/api/client"
 
-export type Role = "officer" | "fraud" | "manager"
+export type Role = Schemas["StaffUser"]["role"]
+type User = Schemas["StaffUser"]
 
-export const ROLES: { key: Role; label: string; defaultName: string }[] = [
-  { key: "officer", label: "Complaints officer", defaultName: "Aina" },
-  { key: "fraud", label: "Fraud analyst", defaultName: "Siti" },
-  { key: "manager", label: "Manager", defaultName: "Manager" },
-]
-
-const KEY = "teratai.role"
-const EVENT = "teratai:role"
-
-function read(): Role {
-  try {
-    const v = window.localStorage.getItem(KEY)
-    if (v === "officer" || v === "fraud" || v === "manager") return v
-  } catch {
-    // storage blocked: fall back to the default role
-  }
-  return "officer"
+interface SessionValue {
+  user: User | null
+  status: "loading" | "ready" | "error"
+  refresh: () => Promise<void>
+  login: (username: string, password: string) => Promise<void>
+  logout: () => Promise<void>
 }
 
-function subscribe(cb: () => void) {
-  window.addEventListener(EVENT, cb)
-  window.addEventListener("storage", cb)
-  return () => {
-    window.removeEventListener(EVENT, cb)
-    window.removeEventListener("storage", cb)
-  }
-}
-
-interface RoleValue {
-  role: Role
-  setRole: (r: Role) => void
-  defaultName: string
-}
-
-const RoleContext = createContext<RoleValue | null>(null)
+const SessionContext = createContext<SessionValue | null>(null)
 
 export function RoleProvider({ children }: { children: React.ReactNode }) {
-  const role = useSyncExternalStore(subscribe, read, () => "officer" as Role)
-  const setRole = useCallback((r: Role) => {
-    try {
-      window.localStorage.setItem(KEY, r)
-    } catch {
-      // storage blocked: the change still applies for this page view via the event below
-    }
-    window.dispatchEvent(new Event(EVENT))
+  const [user, setUser] = useState<User | null>(null)
+  const [status, setStatus] = useState<SessionValue["status"]>("loading")
+  const refresh = useCallback(() => {
+    return fetch("/api/me", { cache: "no-store" }).then(async (r): Promise<User | null> => {
+      if (r.status === 401) return null
+      if (!r.ok) throw new Error("Could not verify session")
+      return r.json()
+    }).then((current) => {
+      setUser(current)
+      setStatus("ready")
+    }).catch(() => {
+      setUser(null)
+      setStatus("error")
+    })
   }, [])
-  const value = useMemo(
-    () => ({ role, setRole, defaultName: ROLES.find((x) => x.key === role)?.defaultName ?? "" }),
-    [role, setRole],
-  )
-  return <RoleContext.Provider value={value}>{children}</RoleContext.Provider>
+
+  useEffect(() => { void refresh() }, [refresh])
+
+  async function login(username: string, password: string) {
+    const r = await fetch("/api/auth/login", {
+      method: "POST", headers: { "Content-Type": "application/json", "X-Requested-With": "teratai" },
+      body: JSON.stringify({ username, password }),
+    })
+    if (!r.ok) {
+      const body = await r.json().catch(() => null)
+      throw new Error(typeof body?.detail === "string" ? body.detail : "Sign-in is unavailable. Please try again.")
+    }
+    setUser(await r.json())
+    setStatus("ready")
+    // A full navigation clears any prefetched content from a previous staff session.
+    window.location.replace("/queues")
+  }
+
+  async function logout() {
+    const r = await fetch("/api/auth/logout", { method: "POST", headers: { "X-Requested-With": "teratai" } })
+    if (!r.ok) throw new Error("Could not sign out. Please try again.")
+    setUser(null)
+    window.location.replace("/login")
+  }
+
+  return <SessionContext.Provider value={{ user, status, refresh, login, logout }}>{children}</SessionContext.Provider>
 }
 
-export function useRole(): RoleValue {
-  const v = useContext(RoleContext)
-  if (!v) throw new Error("useRole must be used inside RoleProvider")
+export function useSession() {
+  const v = useContext(SessionContext)
+  if (!v) throw new Error("useSession must be used inside RoleProvider")
   return v
+}
+
+export function useRole() {
+  const { user } = useSession()
+  if (!user) throw new Error("The workspace requires a verified staff session")
+  return { role: user.role, defaultName: user.username, user }
 }

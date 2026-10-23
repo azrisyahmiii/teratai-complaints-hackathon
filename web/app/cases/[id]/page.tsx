@@ -1,5 +1,7 @@
 import { Suspense } from "react"
 
+export const instant = false
+
 import { CaseView } from "@/components/desk/case-view"
 
 async function Case({ params }: { params: PageProps<"/cases/[id]">["params"] }) {

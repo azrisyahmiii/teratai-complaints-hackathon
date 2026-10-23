@@ -14,6 +14,12 @@ from .conftest import complaint
 IDS = ["CMP-00165", "CMP-00244", "CMP-00387"]
 
 
+@pytest.fixture(autouse=True)
+def _manager_session(client: TestClient) -> None:
+    assert client.post("/api/auth/login", json={"username": "asyraf", "password": "000000"},
+                       headers={"X-Requested-With": "teratai"}).status_code == 200
+
+
 def _store(cid: str, run: str = "exp") -> dict[str, str]:
     row = ComplaintRow(**complaint(cid))
     d = pipeline.process_complaint(row, run)

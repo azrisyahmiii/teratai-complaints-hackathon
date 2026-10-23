@@ -24,13 +24,17 @@ def health() -> dict[str, bool]:
 
 @router.post("/complaints", status_code=202)
 def post_complaint(body: intake.ComplaintIn) -> JSONResponse:
+    return create_complaint(body)
+
+
+def create_complaint(body: intake.ComplaintIn, submitted_by: str | None = None) -> JSONResponse:
     intake.require_fields(body)
     cid = body.complaint_id.strip()
     existing = db.get_case(LIVE, cid)
     if existing is not None:
         return JSONResponse({"complaint_id": cid, "status": existing["status"]}, status_code=200)
     row, channel_known = intake.build_row(body)
-    if not db.insert_processing(LIVE, cid, row.model_dump_json()):
+    if not db.insert_processing(LIVE, cid, row.model_dump_json(), submitted_by):
         again = db.get_case(LIVE, cid)
         return JSONResponse({"complaint_id": cid, "status": again["status"] if again else "processing"}, 200)
     worker.submit(row, channel_known)
