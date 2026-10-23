@@ -1,20 +1,17 @@
 import { Suspense } from "react"
 
-import { PageHeader } from "@/components/desk/page-header"
+import { CaseView } from "@/components/desk/case-view"
 
-async function CaseTitle({ params }: { params: PageProps<"/cases/[id]">["params"] }) {
+async function Case({ params }: { params: PageProps<"/cases/[id]">["params"] }) {
   const { id } = await params
-  return <PageHeader title={`Case ${id}`} />
+  return <CaseView id={decodeURIComponent(id)} />
 }
 
 export default function Page(props: PageProps<"/cases/[id]">) {
   return (
-    <>
-      {/* params are runtime data: with cacheComponents they must be read under Suspense. */}
-      <Suspense fallback={<PageHeader title="Case" />}>
-        <CaseTitle params={props.params} />
-      </Suspense>
-      <p className="p-6 text-muted-foreground">Built in U2.</p>
-    </>
+    // params are runtime data: with cacheComponents they must be read under Suspense.
+    <Suspense fallback={<p className="p-6 text-[13px] text-muted-foreground">Loading case…</p>}>
+      <Case params={props.params} />
+    </Suspense>
   )
 }
