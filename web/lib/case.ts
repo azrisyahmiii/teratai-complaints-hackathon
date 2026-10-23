@@ -12,11 +12,10 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 
 export const str = (v: unknown): string | null => (typeof v === "string" && v !== "" ? v : null)
 
-/** The calc string can arrive with a UTF-8 minus sign decoded as cp1252; show the real sign. */
+/** "1500.00 − 950.00 = 550.00" → "1,500.00 − 950.00 = 550.00" (DESIGN.md §4 calculation format). */
 export function fixCalc(calc: string | null): string | null {
   if (!calc) return null
   return calc
-    .replace(/âˆ’/g, "−")
     .replace(/ - /g, " − ")
     .replace(/\d+\.\d{2}/g, (n) => formatMoney(n).slice(2))
 }
