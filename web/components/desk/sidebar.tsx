@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Suspense } from "react"
-import { BarChart3, Inbox, Leaf, MailCheck, Plus } from "lucide-react"
+import { BarChart3, Inbox, Leaf, MailCheck, Plus, ShieldAlert, UserCheck } from "lucide-react"
 
 import { cn } from "cn"
 import { LotusMark } from "./lotus-mark"
@@ -13,6 +13,9 @@ const NAV = [
   { href: "/intake", label: "New complaint", icon: Plus },
   { href: "/outbox", label: "Outbox", icon: MailCheck },
   { href: "/metrics", label: "Insights", icon: BarChart3 },
+  // Each page checks the signed-in role and explains when it isn't theirs.
+  { href: "/fraud", label: "Fraud workbench", icon: ShieldAlert },
+  { href: "/manager", label: "Manager console", icon: UserCheck },
 ]
 
 function ActiveNav() {
