@@ -763,10 +763,23 @@ def _amount_in_text(amount: Decimal, text: str) -> bool:
     return any(re.search(rf"(?<![\d.]){re.escape(f)}(?!\d|\.\d)", plain) for f in forms)
 
 
+def _whole_amount(value: Decimal, quote: str, text: str) -> bool:
+    """The quote is a whole amount, not a fragment of a longer number ("RM12" of "RM1200", "RM1" of "RM1 500").
+
+    Either the amount grammar finds that value in the text, or the raw quote stands alone there: no digit or letter
+    right after it, no decimal part, no space-grouped thousands.
+    """
+    if value in {v for _s, v, _k, _e in _scan_amounts(text)}:
+        return True
+    alone = re.compile(r"(?<![\w.,])" + re.escape(quote.strip()) + r"(?![\w]|[.,]\d|\s\d{3}\b)", re.IGNORECASE)
+    return alone.search(text) is not None
+
+
 def verified_amount(llm: Issue, detail: LLMDetail | None, text: str) -> tuple[Decimal | None, bool]:
     """(amount, rounded) from the LLM when code can derive it from the text, else (None, False).
 
-    The quote `amount_text` must be a verbatim span of the text and its value must follow from the quote under the
+    The quote `amount_text` must be a verbatim span of the text, parse to a whole amount the code itself finds there
+    (so "RM12" quoted from "RM1200" is refused), and its value must follow from the quote under the
     amount grammar (digits, thousands groups, k, number words); a differing `amount_value` rejects it. Without a
     quote (an old cached answer) the digits of the value must occur in the text.
     """
@@ -774,7 +787,11 @@ def verified_amount(llm: Issue, detail: LLMDetail | None, text: str) -> tuple[De
         quote = verbatim(detail.amount_text, text)
         if quote:
             parsed, rounded = parse_amount_text(quote)
-            if parsed is not None and (detail.amount_value is None or abs(parsed - detail.amount_value) <= Decimal("0.005")):
+            if (
+                parsed is not None
+                and _whole_amount(parsed, detail.amount_text, text)
+                and (detail.amount_value is None or abs(parsed - detail.amount_value) <= Decimal("0.005"))
+            ):
                 return parsed, rounded
         return None, False
     if llm.amount is not None and _amount_in_text(llm.amount, text):

@@ -373,6 +373,13 @@ def _resolve_disagreement(
     if cls_ok != llm_ok:
         return (cls_cat, "classifier", "unique_match") if cls_ok else (llm_cat, "llm", "unique_match")  # type: ignore[return-value]
     how = "both_unique" if cls_ok else "safe_default"
+    pair = {cls_cat, llm_cat}
+    if cls_ok and pair == {"SCAM_TRANSFER", "FAILED_TRANSFER"}:
+        # The evidence settles it: a transfer that failed is a failed transfer; one that completed reached the
+        # payee, so treat it as a scam (INVESTIGATE, never a refund). No scam cue fired (rule 1 above).
+        txn = unique["FAILED_TRANSFER"] or unique["SCAM_TRANSFER"]
+        cat = "FAILED_TRANSFER" if txn and data.txn(txn).status == "Failed" else "SCAM_TRANSFER"
+        return cat, ("classifier" if cat == cls_cat else "llm"), "txn_status"  # type: ignore[return-value]
     for cat in _SAFETY_ORDER:
         if cat in (cls_cat, llm_cat):
             return cat, ("classifier" if cat == cls_cat else "llm"), how  # type: ignore[return-value]

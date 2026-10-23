@@ -367,6 +367,8 @@ def main(argv: list[str] | None = None, process: Process | None = None) -> int:
         ap.error("give --set and/or --groupkfold")
     if args.set_name:
         check_holdout_guard(args.set_name, args.holdout_ok)
+        if args.labels:
+            check_holdout_guard(args.labels, args.holdout_ok)  # hold-out labels behind another --set: same rule
         os.environ["REPLY_MODE"] = args.replies
         from teratai import pipeline
 
