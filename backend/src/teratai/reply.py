@@ -21,7 +21,7 @@ from functools import lru_cache
 from types import ModuleType
 from typing import Any, Literal
 
-from teratai import classify, config, data
+from teratai import classify, config, data, extract
 from teratai.check import check_reply
 from teratai.lang import reply_language
 from teratai.llm import LLMProvider, get_provider, settings
@@ -38,7 +38,7 @@ from teratai.models import (
 )
 from teratai.policy import earlier_identical, money
 from teratai.templates import en as _en
-from teratai.templates import fmt_date, render, state_of, template_key, waiver_reason, who
+from teratai.templates import fmt_date, render, scam_help, state_of, template_key, waiver_reason, who
 from teratai.templates import money as fmt_money
 from teratai.templates import ms as _ms
 
@@ -134,6 +134,8 @@ def build_facts(
     cust = data.customer(row.customer_id)
     state = _state(row, m, d, is_complaint)
     ids: Ids = {"state": state}
+    if category == "SCAM_TRANSFER" and extract.active_scam(f"{row.subject} {row.text}"):
+        ids["urgent"] = "active_scam"  # the scammer may still be on the line: the reply opens with what to do now
     amounts: Amounts = {}
     dates: Dates = {}
     if state == "decided" and m.txn_id and data.has_txn(m.txn_id):
@@ -315,12 +317,16 @@ def fact_sheet_text(facts: FactSheet) -> str:
     if facts.outcome == "INVESTIGATE":
         lines.append(f"working_days_between_updates: {config.SCAM_UPDATE_WORKING_DAYS}")
     template = mod.TEXTS.get(key, "")
+    if "{urgent}" in template and facts.ids.get("urgent"):
+        lines.append("urgent: the customer may still be in contact with the scammer. Put the next include_verbatim "
+                     "sentence first, right after the greeting.")
+        lines.append(f"include_verbatim: {mod.URGENT_SCAM}")
     if "{redress}" in template:
         lines.append(f"include_verbatim: {mod.REDRESS}")
     if "{redress_bnm}" in template:
         lines.append(f"include_verbatim: {mod.REDRESS_BNM}")
     if "{scam_help}" in template:
-        lines.append(f"include_verbatim: {mod.SCAM_HELP}")
+        lines.append(f"include_verbatim: {scam_help(facts)}")
     return "\n".join(lines)
 
 

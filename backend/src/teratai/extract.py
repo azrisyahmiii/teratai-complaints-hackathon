@@ -269,6 +269,26 @@ def mask_sensitive(text: str) -> str:
     return _SENSITIVE.sub(_mask, text)
 
 
+# --- a scam still in progress: the scammer is on the line or asking for more ("he wants more") ----------------
+# The reply then opens with "end the call, don't send more, call NSRC 997 now". "lebih kurang" is "about", not "more".
+_ACTIVE_SCAM = re.compile(
+    r"\bstill\s+(?:on\s+the\s+(?:phone|line|call)|talking|calling|in\s+contact|messaging|texting|chatting|whatsapp)"
+    r"|\bon\s+the\s+(?:phone|line)\s+with\b"
+    r"|\b(?:wants?|asking|asks|keeps?\s+asking|telling|pressuring|forcing|pushing)\s+(?:me\s+)?(?:to\s+)?"
+    r"(?:send|transfer|pay|bank\s+in|deposit|top\s+up)?\s*(?:more|again|another)\b"
+    r"|\bmasih\s+(?:dalam\s+talian|di\s+talian|bercakap|berhubung|call|telefon|menelefon|hubungi|whatsapp|mesej)"
+    r"|\bsedang\s+(?:bercakap|dalam\s+talian|di\s+talian)"
+    r"|\b(?:minta|suruh|desak|paksa)\w*\s+(?:saya\s+)?(?:untuk\s+)?(?:transfer|pindah|bayar|hantar|masuk)\w*\s+"
+    r"(?:lagi|lebih(?!\s+kurang)|tambah)"
+    r"|\b(?:nak|mahu|minta)\s+(?:duit|wang)\s+lagi\b",
+    re.IGNORECASE,
+)
+
+
+def active_scam(text: str) -> bool:
+    return _ACTIVE_SCAM.search(text) is not None
+
+
 # --- third party (SPEC §6 "Wrong customer": "my friend's account") ------------------------------------------
 _RELATIVES = (
     r"friend|wife|husband|spouse|partner|son|daughter|mother|father|mom|mum|dad|brother|sister|parents?|uncle|aunt|"

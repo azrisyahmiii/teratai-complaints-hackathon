@@ -186,3 +186,56 @@ def test_fee_refund_with_something_due_has_no_waiver_reason() -> None:
                 assert "waiver" not in d.facts.ids
                 return
     raise AssertionError("no fee refund with a fee due")
+
+
+# --- §9 #5b: a scam still in progress -> the reply opens with "end the call, don't send more, call 997 now" ----------
+@pytest.mark.parametrize(
+    "text, active",
+    [
+        ("HELP police officer still on the phone with me now, he says move my money to safe account, he wants more", True),
+        ("pegawai polis tu masih dalam talian dgn saya, dia suruh saya transfer lagi ke akaun selamat", True),
+        ("dia nak duit lagi", True),
+        ("Mereka minta saya bayar lebih kurang RM1,000 kepada Farah", False),  # "lebih kurang" = about
+        ("I transferred RM500 to an investment scheme last week and now I can't reach them", False),
+    ],
+)
+def test_active_scam_cue(text: str, active: bool) -> None:
+    assert extract.active_scam(text) is active
+
+
+def test_active_scam_cue_never_fires_on_train() -> None:
+    from teratai import data
+
+    assert not any(extract.active_scam(f"{c.subject} {c.text}") for c in data.complaints())
+
+
+ACTIVE_ROW = ComplaintRow(
+    complaint_id="E08",
+    customer_id="CUS-02247",
+    received_at="2026-08-07 23:24",  # type: ignore[arg-type]
+    channel="App chat",
+    subject="",
+    text="HELP police officer still on the phone with me now, he says move my money to safe account, i already sent "
+    "abt 300 to siti syazwani, he wants more",
+)
+
+
+def test_active_scam_reply_opens_with_the_urgent_line() -> None:
+    from teratai import reply
+    from teratai.templates import en
+
+    d = process_complaint(ACTIVE_ROW, "eval")
+    assert d.category == "SCAM_TRANSFER" and d.outcome == "INVESTIGATE" and d.facts.ids["urgent"] == "active_scam"
+    body = d.reply_text.split("\n\n")[1]
+    assert body.startswith("Thank you for contacting Teratai Bank. " + en.URGENT_SCAM)
+    assert d.reply_text.count("997") == 1 and len(d.reply_text.split()) <= 120 and d.check_ok
+    assert f"include_verbatim: {en.URGENT_SCAM}" in reply.fact_sheet_text(d.facts)
+
+
+def test_past_scam_reply_is_unchanged() -> None:
+    from teratai import data
+    from teratai.templates import en
+
+    d = process_complaint(data.complaint(_first("SCAM_TRANSFER", "INVESTIGATE", "EN")), "eval")
+    assert "urgent" not in d.facts.ids
+    assert en.URGENT_SCAM not in d.reply_text and en.SCAM_HELP in d.reply_text

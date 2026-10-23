@@ -19,6 +19,12 @@ REDRESS = (
 # Fee disputes: FMOS excludes "fees & charges" (commercial decisions; fmos.org.my FAQ Q9), so only BNMLINK is offered.
 REDRESS_BNM = "Jika anda tidak berpuas hati dengan keputusan ini, anda boleh menghubungi BNMLINK di 1-300-88-5465."
 SCAM_HELP = "Sila hubungi juga National Scam Response Centre (NSRC) di 997 dan, jika dinasihatkan, buat laporan polis."
+URGENT_SCAM = (
+    "Jika ada sesiapa yang masih menghubungi anda berkaitan perkara ini, sila tamatkan panggilan sekarang, jangan "
+    "pindahkan wang lagi atau kongsi TAC atau PIN anda, dan hubungi National Scam Response Centre (NSRC) di 997 "
+    "dengan segera."
+)
+SCAM_HELP_AFTER_URGENT = "Jika dinasihatkan, sila buat laporan polis juga."
 REFUND_TIME = "dalam masa {sla_days} hari bekerja"
 WAIVER_REASONS = {
     "age": "Tiada yuran sepatutnya dikenakan ke atas akaun anda kerana yuran tahunan kad debit dikecualikan bagi "
@@ -76,7 +82,7 @@ TEXTS: dict[str, str] = {
     "{update_days} hari bekerja. Belum ada keputusan mengenai pemulangan wang. Sila pastikan kad anda selamat dan maklumkan kepada kami dengan segera tentang "
     "sebarang transaksi lain yang anda tidak kenali." + CLOSE,
     "SCAM_TRANSFER.INVESTIGATE": OPEN
-    + "Kami memohon maaf atas kesulitan yang anda alami. Pasukan siasatan penipuan kami telah mula meneliti "
+    + "{urgent}Kami memohon maaf atas kesulitan yang anda alami. Pasukan siasatan penipuan kami telah mula meneliti "
     "pemindahan wang anda{to} sebanyak {amount} pada {date} (transaksi {txn}) dan akan cuba menuntut semula dana "
     "tersebut, walaupun pemulihan tidak dijamin. {scam_help} Kami akan memaklumkan perkembangan sekurang-kurangnya "
     "setiap {update_days} hari bekerja sehingga siasatan selesai." + CLOSE,
@@ -98,7 +104,7 @@ TEXTS: dict[str, str] = {
     "jumlahnya dan nama pedagang atau penerima. Setelah kami menerima maklumat ini, kami akan menyemak kes anda dalam "
     "masa {sla_days} hari bekerja." + CLOSE,
     "NEEDS_INFO.SCAM": OPEN
-    + "Untuk menyemak aduan anda, kami memerlukan sedikit maklumat tambahan. Sila balas dengan tarikh transaksi, "
+    + "{urgent}Untuk menyemak aduan anda, kami memerlukan sedikit maklumat tambahan. Sila balas dengan tarikh transaksi, "
     "jumlahnya dan nama penerima. {scam_help}" + CLOSE,
     "WRONG_CUSTOMER": OPEN
     + "Kami tidak dapat memadankan kad atau akaun yang dinyatakan dalam mesej anda dengan akaun anda sendiri di bank "

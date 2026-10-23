@@ -64,6 +64,12 @@ def who(facts: FactSheet) -> str:
     return " ".join(p for p in (facts.honorific, facts.customer_name) if p)
 
 
+def scam_help(facts: FactSheet) -> str:
+    """NSRC 997 + police report; when the scam is still in progress, URGENT_SCAM already gave 997."""
+    mod = _LANGS[facts.language]
+    return str(mod.SCAM_HELP_AFTER_URGENT if facts.ids.get("urgent") else mod.SCAM_HELP)
+
+
 def waiver_reason(facts: FactSheet) -> str:
     """Why no fee was due, in the reply language (FactSheet.ids["waiver"]; an unknown or missing reason says only that)."""
     reasons = _LANGS[facts.language].WAIVER_REASONS
@@ -82,9 +88,10 @@ def context(facts: FactSheet) -> dict[str, str]:
         "update_days": str(config.SCAM_UPDATE_WORKING_DAYS),
         "redress": mod.REDRESS,
         "redress_bnm": mod.REDRESS_BNM,
-        "scam_help": mod.SCAM_HELP,
+        "scam_help": scam_help(facts),
         "at": "",
         "to": "",
+        "urgent": mod.URGENT_SCAM + " " if facts.ids.get("urgent") else "",
     }
     ctx["waiver_reason"] = waiver_reason(facts)
     merchant = facts.ids.get("merchant", "")
