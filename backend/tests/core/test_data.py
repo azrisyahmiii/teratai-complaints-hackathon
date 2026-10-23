@@ -127,3 +127,44 @@ def test_reloading_is_idempotent_and_fast() -> None:
     assert warm < 0.01
     with (config.DATA_DIR / "transactions.csv").open(encoding="utf-8") as f:
         assert len(data._txn_index().by_id) == sum(1 for _ in csv.reader(f)) - 1
+
+
+def test_once_builds_a_loader_once_under_concurrent_cold_calls() -> None:
+    # functools.cache doesn't lock: 20 cold API requests each rebuilt the txn index (59 s instead of 4 s)
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    calls = 0
+    gate = threading.Barrier(20)
+
+    @data.once
+    def slow() -> list[int]:
+        nonlocal calls
+        calls += 1
+        time.sleep(0.05)
+        return [calls]
+
+    def first_call(_: int) -> list[int]:
+        gate.wait()
+        return slow()
+
+    with ThreadPoolExecutor(20) as ex:
+        results = list(ex.map(first_call, range(20)))
+    assert calls == 1 and all(r is results[0] for r in results)
+    slow.cache_clear()
+    assert slow() == [2] and calls == 2
+
+
+def test_once_loader_may_clear_itself_while_building() -> None:
+    # classify._artifact -> train() -> _artifact.cache_clear(): must not deadlock on the loader's own lock
+    @data.once
+    def loader() -> str:
+        loader.cache_clear()
+        return "built"
+
+    assert loader() == "built" and loader() == "built"
+
+
+def test_warm_loads_every_csv() -> None:
+    data.warm()
+    assert data._txn_index._box is not None and data.labels._box is not None

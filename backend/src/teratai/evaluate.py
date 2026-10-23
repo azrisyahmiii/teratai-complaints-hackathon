@@ -32,6 +32,9 @@ import score as official
 FIXTURES = config.BACKEND_DIR / "tests" / "core" / "fixtures"
 SETS = {
     "messy_dev": (FIXTURES / "messy_dev.csv", FIXTURES / "messy_dev_labels.csv"),
+    # 26 messy rewrites of unused train rows (incl. an injection and a balance-amount distractor), never tuned on.
+    # Scored once at 85fa9d9: live 100.00, regex only 97.12. Report on it; don't tune against it.
+    "blind_probe": (FIXTURES / "blind_probe.csv", FIXTURES / "blind_probe_labels.csv"),
     "messy_holdout": (FIXTURES / "holdout" / "messy_holdout.csv", FIXTURES / "holdout" / "messy_holdout_labels.csv"),
 }
 HOLDOUT_FLAG = "--i-am-scoring-the-holdout"

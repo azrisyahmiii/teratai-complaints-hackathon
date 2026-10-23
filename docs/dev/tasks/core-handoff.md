@@ -58,8 +58,10 @@ Core's globs that Core changed:
 
 ## 4. `pipeline.py` changes (yours)
 ```python
-facts = reply.build_facts(row, issue.category, m, d, u.is_complaint)   # optional arg already exists
+facts = reply.build_facts(row, issue.category, m, d, u.is_complaint,  # optional args already exist
+                          [i.category for i in u.issues[1:]])          # C20: other problems -> noted in the reply
 flags = sorted({*events_flags,                    # until Reply.flags lands: read the final stage="reply" payload
+                *(["multi_issue"] if len(u.issues) > 1 else []),  # C20: show it; an officer answers the other issue
                 *(["injection_suspected"] if u.injection_suspected else []),
                 *(["check_flagged"] if not r.check.ok else []),
                 *(["wrong_customer"] if m.status == "WRONG_CUSTOMER" else []),
@@ -67,6 +69,14 @@ flags = sorted({*events_flags,                    # until Reply.flags lands: rea
                 *(["vulnerable"] if d.inputs.get("vulnerable_bump") == "yes" else [])})
 ```
 Use `u.language` for `reply_language` instead of recomputing it. Core memoises `lang.reply_language` meanwhile.
+
+C20 additions (one line each):
+- **API startup:** call `classify.warm()` in the FastAPI lifespan. The loaders are now thread-safe either way (20 cold
+  concurrent complaints: 59.5 s → 3.7 s), so this only moves the ~2 s load out of the first request.
+- **`multi_issue`:** the reply already tells the customer "we have also noted your question about a fee … we will reply
+  separately", so the flag must reach a person, even on AUTO_RESOLVE (a queue badge or a manager alert).
+- **Card and IC numbers:** Core masks them before any LLM call (`extract.mask_sensitive`). Use the same helper if you
+  store or display the complaint text.
 Full flag table: [contract-proposals.md](contract-proposals.md) §1.
 
 ## 5. Check it

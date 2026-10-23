@@ -22,7 +22,6 @@ import re
 import sys
 import time
 from dataclasses import dataclass
-from functools import cache
 from typing import Any
 
 import joblib
@@ -35,7 +34,7 @@ from sklearn.model_selection import GroupKFold, StratifiedKFold, cross_val_predi
 from sklearn.pipeline import FeatureUnion, Pipeline
 
 from teratai import config, data, dates, extract, lang
-from teratai.models import Category, ComplaintRow, Emit, Mode, StageEvent, Understanding
+from teratai.models import Category, ComplaintRow, Emit, Issue, Mode, StageEvent, Understanding
 
 TARGET_ACCEPTED_ACCURACY = 0.99  # accepted (conf >= tau) OOF items must be at least this accurate
 MAX_BELOW_TAU_SHARE = 0.10  # at most this share of items may fall below tau (goes to the LLM)
@@ -255,7 +254,7 @@ def train() -> Artifact:
     return art
 
 
-@cache
+@data.once
 def _artifact() -> Artifact:
     """Load the persisted model; train on first use (or when the data or MODEL_VERSION changed)."""
     ids, texts, y = _training_set()
@@ -266,6 +265,12 @@ def _artifact() -> Artifact:
             if isinstance(art, Artifact) and art.fingerprint == _fingerprint(ids, texts, y):
                 return art
     return train()
+
+
+def warm() -> None:
+    """Load the data and the classifier now (API startup), so the first requests don't pay for it."""
+    data.warm()
+    _artifact()
 
 
 def tau() -> float:
@@ -388,6 +393,17 @@ def _resolve_disagreement(
     return llm_cat, "llm", how  # type: ignore[return-value]
 
 
+def _other_issues(llm: extract.LLMExtraction, category: str) -> list[Issue]:
+    """The LLM's further problems (it lists one issue per problem), category only: noted in the reply for an officer,
+    never matched or decided (SPEC §5 could-have). The first LLM issue is the primary reading, never "another" one."""
+    seen, out = {category}, []
+    for i in llm.issues[1:]:
+        if i.category not in seen:
+            seen.add(i.category)
+            out.append(Issue(category=i.category))
+    return out
+
+
 def _merge_llm(
     row: ComplaintRow, base: Understanding, llm: extract.LLMExtraction, probs: NDF, classes: list[str],
     threshold: float,
@@ -430,7 +446,7 @@ def _merge_llm(
     language, language_reason = lang.reply_language(row, llm.language)
     merged = base.model_copy(
         update={
-            "issues": [issue],
+            "issues": [issue, *_other_issues(llm, category)],
             "source": source,
             "language": language,
             "language_reason": language_reason,
@@ -496,6 +512,7 @@ def understand(row: ComplaintRow, mode: Mode, emit: Emit) -> Understanding:
                 "category_disagreement": disagreement,
                 "degraded": llm_reason is not None and not llm_called,
                 "clues": result.issues[0].model_dump(mode="json"),
+            "other_issues": [i.category for i in result.issues[1:]],
                 "language": result.language,
                 "language_reason": result.language_reason,
                 "scam_cue": result.scam_cue,
