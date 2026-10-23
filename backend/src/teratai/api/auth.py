@@ -36,7 +36,10 @@ class LoginIn(BaseModel):
 def seed_users() -> None:
     """Only create missing demo users; never reset an existing password on restart."""
     with db.connect() as con:
-        for username, role in (("asyraf", "manager"), ("leon", "officer"), ("azri", "fraud")):
+        for username, role in (
+            ("asyraf", "manager"), ("leon", "officer"), ("azri", "fraud"),
+            ("vincent", "officer"), ("nishan", "fraud"),
+        ):
             if con.execute("SELECT 1 FROM users WHERE username=?", (username,)).fetchone():
                 continue
             hashed = bcrypt.hashpw(b"000000", bcrypt.gensalt()).decode()

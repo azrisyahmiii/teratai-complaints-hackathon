@@ -9,10 +9,14 @@ in the top-right staff bar. Do not display complaint content until the server va
 | asyraf | Manager | Both teams, all runs, prediction export, approvals above the officer limit |
 | leon | Complaints officer | General complaints and their resolved history; approval up to RM2,000 |
 | azri | Fraud analyst | Fraud cases and their holding replies, evidence and audit history |
+| vincent | Complaints officer | Same general-complaints access and RM2,000 approval limit as leon |
+| nishan | Fraud analyst | Same fraud access as azri |
 
-The requested local demonstration password is `000000` for all three users. Passwords are bcrypt hashes in SQLite;
+The requested local demonstration password is `000000` for all five users. Passwords are bcrypt hashes in SQLite;
 the browser receives an opaque, expiring HttpOnly session cookie, not a role it can change. Logout revokes the session.
 Seed users once without resetting existing passwords. Use Secure cookies when `AUTH_COOKIE_SECURE=1` behind HTTPS.
+Profile pictures use the supplied, matching filenames under `web/public/images/profiles/` and appear beside the
+signed-in ID and role. These are static demo assets; users without a supplied picture keep the initial avatar.
 
 SQLite has no native row-level security. Staff list/detail/check/action/outbox queries share a server-side row predicate
 based on the immutable agent route. Pending cases are visible only to their submitter and the manager. Once decided,
