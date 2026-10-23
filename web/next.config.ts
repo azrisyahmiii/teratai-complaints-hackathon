@@ -6,7 +6,11 @@ const nextConfig: NextConfig = {
   partialPrefetching: true,
   async rewrites() {
     const apiUrl = process.env.API_URL ?? "http://localhost:8000";
-    return [{ source: "/api/:path*", destination: `${apiUrl}/api/:path*` }];
+    return [
+      { source: "/api/:path*", destination: `${apiUrl}/api/:path*` },
+      // The organisers' API (/complaints, /cases/{id}, /cases/{id}/actions) has no /api prefix.
+      { source: "/agent/:path*", destination: `${apiUrl}/:path*` },
+    ];
   },
   turbopack: {
     rules: {

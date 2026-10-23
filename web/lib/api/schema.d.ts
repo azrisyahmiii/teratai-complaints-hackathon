@@ -4,6 +4,168 @@
  */
 
 export interface paths {
+    "/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Health */
+        get: operations["health_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/complaints": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Complaint */
+        post: operations["post_complaint_complaints_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cases/{complaint_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Case */
+        get: operations["get_case_cases__complaint_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cases/{complaint_id}/actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Action */
+        post: operations["post_action_cases__complaint_id__actions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/export/predictions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Predictions */
+        get: operations["predictions_api_export_predictions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Cases
+         * @description Every case in the run, sorted by priority then received time; `state` filters items, never counts or figures.
+         */
+        get: operations["list_cases_api_cases_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cases/{complaint_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Case Detail */
+        get: operations["get_case_detail_api_cases__complaint_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cases/{complaint_id}/check-reply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Reply
+         * @description Dry-run the self-check on an edited reply. Changes nothing; approving still goes through /actions.
+         */
+        post: operations["check_reply_api_cases__complaint_id__check_reply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/outbox": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Outbox
+         * @description Simulated replies sent to customers, newest first.
+         */
+        get: operations["list_outbox_api_outbox_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -21,282 +183,176 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/complaints": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Create Complaint */
-        post: operations["create_complaint_api_complaints_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/cases": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Cases */
-        get: operations["list_cases_api_cases_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/cases/{case_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Case */
-        get: operations["get_case_api_cases__case_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /**
-         * AgentDecision
-         * @description Immutable (SPEC §4.8). The predictions.csv row comes only from this.
-         *
-         *     WRONG_CUSTOMER (§6): match.status says so, flags has "wrong_customer", reply_text "";
-         *     the CSV row uses the §6 NEEDS_INFO defaults.
-         */
-        AgentDecision: {
-            /** Complaint Id */
-            complaint_id: string;
-            /** Run Id */
-            run_id: string;
-            /** Customer Id */
-            customer_id: string;
+        /** ActionIn */
+        ActionIn: {
             /**
-             * Category
+             * Action
              * @enum {string}
              */
-            category: "DUPLICATE_CHARGE" | "FAILED_TRANSFER" | "ATM_NOT_DISPENSED" | "UNAUTHORISED_CARD" | "SCAM_TRANSFER" | "FEE_DISPUTE" | "SERVICE_QUALITY";
-            /** Category Conf */
-            category_conf: number;
-            /** Matched Txn Id */
-            matched_txn_id: string;
+            action: "approve" | "reject" | "edit_approve";
             /**
-             * Outcome
-             * @enum {string}
+             * Actor
+             * @default
              */
-            outcome: "REFUND" | "DECLINE" | "INVESTIGATE" | "INFO_ONLY";
-            /** Refund Amount Myr */
-            refund_amount_myr: string;
+            actor: string;
             /**
-             * Priority
-             * @enum {string}
+             * Reason
+             * @default
              */
-            priority: "P1" | "P2" | "P3";
-            /**
-             * Reply Language
-             * @enum {string}
-             */
-            reply_language: "EN" | "MS";
-            /**
-             * Route
-             * @enum {string}
-             */
-            route: "AUTO_RESOLVE" | "HUMAN_APPROVAL" | "FRAUD_TEAM";
+            reason: string;
             /** Reply Text */
-            reply_text: string;
-            /** Check Ok */
-            check_ok: boolean;
-            /** Flags */
-            flags: string[];
-            understanding: components["schemas"]["Understanding"];
-            match: components["schemas"]["MatchResult"];
-            decision: components["schemas"]["Decision"];
-            facts: components["schemas"]["FactSheet"];
-            reply: components["schemas"]["Reply"];
+            reply_text?: string | null;
         };
-        /** Candidate */
-        Candidate: {
+        /** AtmJournalView */
+        AtmJournalView: {
             /** Txn Id */
             txn_id: string;
-            /** Score */
-            score: number;
-            /** Breakdown */
-            breakdown: {
-                [key: string]: number;
-            };
-        };
-        /** CaseCreated */
-        CaseCreated: {
-            /** Case Id */
-            case_id: number;
-            /** Complaint Id */
-            complaint_id: string;
-            /** Existing */
-            existing: boolean;
+            /** Atm Location */
+            atm_location: string;
+            /** Requested Myr */
+            requested_myr: string;
+            /** Dispensed Myr */
+            dispensed_myr: string;
+            /** Journal Status */
+            journal_status: string;
         };
         /** CaseDetail */
         CaseDetail: {
-            /** Id */
-            id: number;
-            /** Complaint Id */
-            complaint_id: string;
-            /** Run Id */
-            run_id: string;
-            /** Customer Id */
-            customer_id: string;
-            /** Category */
-            category: ("DUPLICATE_CHARGE" | "FAILED_TRANSFER" | "ATM_NOT_DISPENSED" | "UNAUTHORISED_CARD" | "SCAM_TRANSFER" | "FEE_DISPUTE" | "SERVICE_QUALITY") | null;
-            /** Priority */
-            priority: ("P1" | "P2" | "P3") | null;
-            /** Route */
-            route: ("AUTO_RESOLVE" | "HUMAN_APPROVAL" | "FRAUD_TEAM") | null;
-            /**
-             * Status
-             * @enum {string}
-             */
-            status: "pending" | "escalated" | "approved" | "rejected" | "sent" | "investigating" | "closed" | "needs_info";
-            /** Refund Amount Myr */
-            refund_amount_myr: string | null;
-            /** Reply Language */
-            reply_language: ("EN" | "MS") | null;
-            /** Assigned To */
-            assigned_to: string | null;
-            /** Ack Due */
-            ack_due: string | null;
-            /** Resolve Due */
-            resolve_due: string | null;
-            /** Flags */
-            flags: string[];
-            row: components["schemas"]["ComplaintRow"];
-            agent_decision: components["schemas"]["AgentDecision"] | null;
-            /** Final Action */
-            final_action: {
+            case: components["schemas"]["CaseRow"];
+            /** Subject */
+            subject: string;
+            /** Text */
+            text: string;
+            /** Error */
+            error?: string | null;
+            /** Customer Preferred Language */
+            customer_preferred_language?: string | null;
+            /** Human Action */
+            human_action?: {
                 [key: string]: unknown;
             } | null;
-            /** Check Ok */
-            check_ok: boolean | null;
-            /** Check Issues */
-            check_issues: components["schemas"]["CheckIssue"][];
-            /** Events */
-            events: components["schemas"]["CaseEvent"][];
-        };
-        /**
-         * CaseEvent
-         * @description One case_events row (SPEC §10): agent stage or human action.
-         */
-        CaseEvent: {
-            /** Id */
-            id: number;
-            /** Case Id */
-            case_id: number;
-            /**
-             * Ts
-             * Format: date-time
-             */
-            ts: string;
-            /** Actor */
-            actor: string;
-            /** Action */
-            action: string;
-            /** Stage */
-            stage?: string | null;
-            /** Field */
-            field?: string | null;
-            /** Old Value */
-            old_value?: string | null;
-            /** New Value */
-            new_value?: string | null;
-            /** Reason */
-            reason?: string | null;
-            /**
-             * Payload
-             * @default {}
-             */
-            payload: {
+            /** Decision */
+            decision?: {
                 [key: string]: unknown;
-            };
-            /** Tool Name */
-            tool_name?: string | null;
-            /** Model */
-            model?: string | null;
+            } | null;
+            /** Understanding */
+            understanding?: {
+                [key: string]: unknown;
+            } | null;
+            /** Window */
+            window?: {
+                [key: string]: unknown;
+            } | null;
+            /** Match Status */
+            match_status?: string | null;
             /**
-             * Tokens In
+             * Evidence
+             * @default []
+             */
+            evidence: components["schemas"]["EvidenceRow"][];
+            atm_journal?: components["schemas"]["AtmJournalView"] | null;
+            /**
+             * Reply Text
+             * @default
+             */
+            reply_text: string;
+            /** Reply Source */
+            reply_source?: string | null;
+            /**
+             * Reply Drafts
              * @default 0
              */
-            tokens_in: number;
+            reply_drafts: number;
             /**
-             * Tokens Out
-             * @default 0
+             * Check Issues
+             * @default []
              */
-            tokens_out: number;
+            check_issues: components["schemas"]["CheckIssue"][];
             /**
-             * Cost Usd
-             * @default 0
+             * Tokens
+             * @default []
              */
-            cost_usd: string;
+            tokens: components["schemas"]["TokenVerdict"][];
             /**
-             * Latency Ms
-             * @default 0
+             * Events
+             * @default []
              */
-            latency_ms: number;
+            events: components["schemas"]["EventView"][];
             /**
-             * Ok
-             * @default true
+             * Outbox
+             * @default []
              */
-            ok: boolean;
+            outbox: components["schemas"]["OutboxItem"][];
         };
-        /** CaseSummary */
-        CaseSummary: {
-            /** Id */
-            id: number;
+        /** CaseList */
+        CaseList: {
+            /** Items */
+            items: components["schemas"]["CaseRow"][];
+            /** Counts */
+            counts: {
+                [key: string]: number;
+            };
+            figures: components["schemas"]["Figures"];
+        };
+        /** CaseRow */
+        CaseRow: {
             /** Complaint Id */
             complaint_id: string;
-            /** Run Id */
-            run_id: string;
-            /** Customer Id */
-            customer_id: string;
-            /** Category */
-            category: ("DUPLICATE_CHARGE" | "FAILED_TRANSFER" | "ATM_NOT_DISPENSED" | "UNAUTHORISED_CARD" | "SCAM_TRANSFER" | "FEE_DISPUTE" | "SERVICE_QUALITY") | null;
-            /** Priority */
-            priority: ("P1" | "P2" | "P3") | null;
-            /** Route */
-            route: ("AUTO_RESOLVE" | "HUMAN_APPROVAL" | "FRAUD_TEAM") | null;
             /**
              * Status
              * @enum {string}
              */
-            status: "pending" | "escalated" | "approved" | "rejected" | "sent" | "investigating" | "closed" | "needs_info";
+            status: "processing" | "done" | "error";
+            /** Customer Id */
+            customer_id: string;
+            /** Customer Name */
+            customer_name: string;
+            /** Channel */
+            channel: string;
+            /**
+             * Received At
+             * Format: date-time
+             */
+            received_at: string;
+            /** Category */
+            category?: string | null;
+            /** Priority */
+            priority?: string | null;
+            /** Outcome */
+            outcome?: string | null;
+            /** Route */
+            route?: string | null;
             /** Refund Amount Myr */
-            refund_amount_myr: string | null;
+            refund_amount_myr?: string | null;
+            /** Disputed Amount Myr */
+            disputed_amount_myr?: string | null;
             /** Reply Language */
-            reply_language: ("EN" | "MS") | null;
-            /** Assigned To */
-            assigned_to: string | null;
+            reply_language?: string | null;
+            /** Case State */
+            case_state?: string | null;
+            /**
+             * Sent
+             * @default false
+             */
+            sent: boolean;
+            /** Self Check */
+            self_check?: ("passed" | "flagged") | null;
             /** Ack Due */
-            ack_due: string | null;
-            /** Resolve Due */
-            resolve_due: string | null;
-            /** Flags */
+            ack_due?: string | null;
+            /**
+             * Flags
+             * @default []
+             */
             flags: string[];
+        };
+        /** CheckIn */
+        CheckIn: {
+            /** Text */
+            text: string;
         };
         /** CheckIssue */
         CheckIssue: {
@@ -310,227 +366,211 @@ export interface components {
             /** Token */
             token?: string | null;
         };
-        /** CheckResult */
-        CheckResult: {
-            /** Ok */
-            ok: boolean;
+        /** CheckOut */
+        CheckOut: {
+            /**
+             * Self Check
+             * @enum {string}
+             */
+            self_check: "passed" | "flagged";
             /** Issues */
             issues: components["schemas"]["CheckIssue"][];
+            /** Tokens */
+            tokens: components["schemas"]["TokenVerdict"][];
         };
-        /**
-         * ComplaintRow
-         * @description One complaints.csv row.
-         */
-        ComplaintRow: {
-            /** Complaint Id */
-            complaint_id?: string | null;
-            /** Customer Id */
+        /** ComplaintIn */
+        ComplaintIn: {
+            /**
+             * Complaint Id
+             * @default
+             */
+            complaint_id: string;
+            /**
+             * Customer Id
+             * @default
+             */
             customer_id: string;
             /**
              * Received At
-             * Format: date-time
+             * @default
              */
             received_at: string;
             /**
              * Channel
-             * @enum {string}
+             * @default
              */
-            channel: "App chat" | "Email" | "Call centre note" | "Branch form" | "Social media DM";
+            channel: string;
             /**
              * Subject
              * @default
              */
             subject: string;
-            /** Text */
+            /**
+             * Text
+             * @default
+             */
             text: string;
         };
-        /**
-         * DateWindow
-         * @description SPEC §4.3: inclusive search window; exact_day scores higher.
-         */
-        DateWindow: {
-            /**
-             * Start
-             * Format: date
-             */
-            start: string;
-            /**
-             * End
-             * Format: date
-             */
-            end: string;
-            /** Exact Day */
-            exact_day?: string | null;
-            /** Phrase */
-            phrase?: string | null;
+        /** EventView */
+        EventView: {
+            /** Ts */
+            ts: string;
+            /** Actor */
+            actor: string;
+            /** Action */
+            action: string | null;
+            /** Stage */
+            stage: string | null;
+            /** Model */
+            model: string | null;
+            /** Latency Ms */
+            latency_ms: number;
+            /** Cost Usd */
+            cost_usd: string;
+            /** Ok */
+            ok: boolean;
+            /** Payload */
+            payload: {
+                [key: string]: unknown;
+            };
         };
-        /** Decision */
-        Decision: {
+        /** EvidenceRow */
+        EvidenceRow: {
+            /** Txn Id */
+            txn_id: string;
             /**
-             * Outcome
+             * Role
              * @enum {string}
              */
-            outcome: "REFUND" | "DECLINE" | "INVESTIGATE" | "INFO_ONLY";
-            /** Refund Myr */
-            refund_myr: string;
+            role: "matched" | "candidate" | "duplicate_sibling" | "reversal";
             /**
-             * Priority
-             * @enum {string}
+             * Txn Time
+             * Format: date-time
              */
-            priority: "P1" | "P2" | "P3";
+            txn_time: string;
+            /** Amount Myr */
+            amount_myr: string;
+            /** Channel */
+            channel: string;
+            /** Merchant */
+            merchant: string;
+            /** Status */
+            status: string;
+            /** Auth Method */
+            auth_method: string;
+            /** Description */
+            description: string;
+            /** Score */
+            score?: number | null;
             /**
-             * Route
-             * @enum {string}
+             * Score Breakdown
+             * @default {}
              */
-            route: "AUTO_RESOLVE" | "HUMAN_APPROVAL" | "FRAUD_TEAM";
-            /** Needs Info */
-            needs_info: boolean;
-            /** Rule Id */
-            rule_id: string;
-            /** Rule Text */
-            rule_text: string;
-            /** Inputs */
-            inputs: {
-                [key: string]: string;
+            score_breakdown: {
+                [key: string]: number;
             };
-            /** Calc */
-            calc?: string | null;
         };
-        /** FactSheet */
-        FactSheet: {
-            /** Customer Name */
-            customer_name: string;
-            /** Honorific */
-            honorific: string;
+        /** Figures */
+        Figures: {
             /**
-             * Language
-             * @enum {string}
+             * Now
+             * Format: date-time
              */
-            language: "EN" | "MS";
-            /**
-             * Category
-             * @enum {string}
-             */
-            category: "DUPLICATE_CHARGE" | "FAILED_TRANSFER" | "ATM_NOT_DISPENSED" | "UNAUTHORISED_CARD" | "SCAM_TRANSFER" | "FEE_DISPUTE" | "SERVICE_QUALITY";
-            /**
-             * Outcome
-             * @enum {string}
-             */
-            outcome: "REFUND" | "DECLINE" | "INVESTIGATE" | "INFO_ONLY";
-            /** Refund Myr */
-            refund_myr: string;
-            /** Ids */
-            ids: {
-                [key: string]: string;
-            };
-            /** Amounts */
-            amounts: {
-                [key: string]: string;
-            };
-            /** Dates */
-            dates: {
-                [key: string]: string;
-            };
-            /** Sla Days */
-            sla_days: number;
+            now: string;
+            officer: components["schemas"]["OfficerFigures"];
+            fraud: components["schemas"]["FraudFigures"];
+            manager: components["schemas"]["ManagerFigures"];
+        };
+        /** FraudFigures */
+        FraudFigures: {
+            /** Open */
+            open: number;
+            /** P1 Open */
+            p1_open: number;
+            /** Ack Overdue */
+            ack_overdue: number;
+            /** Amount Disputed Myr */
+            amount_disputed_myr: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** ManagerFigures */
+        ManagerFigures: {
+            /** All */
+            all: number;
+            /** Awaiting Approval */
+            awaiting_approval: number;
+            /** With Fraud Team */
+            with_fraud_team: number;
+            /** Auto Resolved */
+            auto_resolved: number;
+            /** Processing */
+            processing: number;
+            /** Errors */
+            errors: number;
+        };
+        /** OfficerFigures */
+        OfficerFigures: {
+            /** Waiting */
+            waiting: number;
+            /** P1 Waiting */
+            p1_waiting: number;
+            /** Ack Due 2H */
+            ack_due_2h: number;
+            /** Check Flagged */
+            check_flagged: number;
+            oldest: components["schemas"]["Oldest"] | null;
+        };
+        /** Oldest */
+        Oldest: {
+            /** Complaint Id */
+            complaint_id: string;
+            /**
+             * Received At
+             * Format: date-time
+             */
+            received_at: string;
+        };
+        /** OutboxItem */
+        OutboxItem: {
+            /** Id */
+            id: number;
+            /** Complaint Id */
+            complaint_id: string;
+            /** Customer Name */
+            customer_name: string;
+            /** Ts */
+            ts: string;
+            /** Language */
+            language: string;
+            /** Text */
+            text: string;
+            /** Authorised By */
+            authorised_by: string;
+        };
         /**
-         * Issue
-         * @description SPEC §4.2 extraction schema, one per issue.
+         * TokenVerdict
+         * @description One checked token with its position in the text, for green / red highlighting.
          */
-        Issue: {
-            /**
-             * Category
-             * @enum {string}
-             */
-            category: "DUPLICATE_CHARGE" | "FAILED_TRANSFER" | "ATM_NOT_DISPENSED" | "UNAUTHORISED_CARD" | "SCAM_TRANSFER" | "FEE_DISPUTE" | "SERVICE_QUALITY";
-            /** Amount */
-            amount?: string | null;
-            /**
-             * Amount Approx
-             * @default false
-             */
-            amount_approx: boolean;
-            /** Counterparty */
-            counterparty?: string | null;
-            /** Date Phrase */
-            date_phrase?: string | null;
-            /** Card Last4 */
-            card_last4?: string | null;
-            /** Fee Type */
-            fee_type?: ("monthly_service" | "debit_annual" | "cc_annual") | null;
-            /** Fee Month */
-            fee_month?: string | null;
-            /** Card In Possession */
-            card_in_possession?: boolean | null;
-        };
-        /** MatchResult */
-        MatchResult: {
-            /**
-             * Status
-             * @enum {string}
-             */
-            status: "UNIQUE" | "NONE" | "AMBIGUOUS" | "WRONG_CUSTOMER" | "NO_TXN";
-            /** Txn Id */
-            txn_id: string | null;
-            window: components["schemas"]["DateWindow"];
-            /** Candidates */
-            candidates: components["schemas"]["Candidate"][];
-            /** Related */
-            related: {
-                [key: string]: string;
-            };
-            /**
-             * Source
-             * @enum {string}
-             */
-            source: "matcher" | "investigator";
-        };
-        /** Reply */
-        Reply: {
+        TokenVerdict: {
+            /** Start */
+            start: number;
+            /** End */
+            end: number;
             /** Text */
             text: string;
             /**
-             * Source
+             * Kind
              * @enum {string}
              */
-            source: "llm" | "redraft" | "template";
-            check: components["schemas"]["CheckResult"];
-            /** Drafts */
-            drafts: string[];
-        };
-        /** Understanding */
-        Understanding: {
-            /** Issues */
-            issues: components["schemas"]["Issue"][];
-            /** Top3 */
-            top3: [
-                "DUPLICATE_CHARGE" | "FAILED_TRANSFER" | "ATM_NOT_DISPENSED" | "UNAUTHORISED_CARD" | "SCAM_TRANSFER" | "FEE_DISPUTE" | "SERVICE_QUALITY",
-                number
-            ][];
-            /**
-             * Source
-             * @enum {string}
-             */
-            source: "rules" | "classifier" | "llm";
-            /**
-             * Language
-             * @enum {string}
-             */
-            language: "EN" | "MS";
-            /** Language Reason */
-            language_reason: string;
-            /** Is Complaint */
-            is_complaint: boolean;
-            /** Injection Suspected */
-            injection_suspected: boolean;
-            /** Scam Cue */
-            scam_cue: boolean;
+            kind: "TXN_ID" | "AMOUNT" | "PHONE_URL";
+            /** Verified */
+            verified: boolean;
+            /** Value */
+            value?: string | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -554,7 +594,7 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    health_api_health_get: {
+    health_health_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -570,13 +610,13 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        [key: string]: string;
+                        [key: string]: boolean;
                     };
                 };
             };
         };
     };
-    create_complaint_api_complaints_post: {
+    post_complaint_complaints_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -585,7 +625,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ComplaintRow"];
+                "application/json": components["schemas"]["ComplaintIn"];
             };
         };
         responses: {
@@ -595,7 +635,108 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CaseCreated"];
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_case_cases__complaint_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                complaint_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_action_cases__complaint_id__actions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                complaint_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    predictions_api_export_predictions_get: {
+        parameters: {
+            query: {
+                run_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -611,7 +752,10 @@ export interface operations {
     };
     list_cases_api_cases_get: {
         parameters: {
-            query?: never;
+            query?: {
+                state?: string | null;
+                run_id?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -624,17 +768,28 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CaseSummary"][];
+                    "application/json": components["schemas"]["CaseList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
     };
-    get_case_api_cases__case_id__get: {
+    get_case_detail_api_cases__complaint_id__get: {
         parameters: {
-            query?: never;
+            query?: {
+                run_id?: string;
+            };
             header?: never;
             path: {
-                case_id: number;
+                complaint_id: string;
             };
             cookie?: never;
         };
@@ -656,6 +811,96 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_reply_api_cases__complaint_id__check_reply_post: {
+        parameters: {
+            query?: {
+                run_id?: string;
+            };
+            header?: never;
+            path: {
+                complaint_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_outbox_api_outbox_get: {
+        parameters: {
+            query?: {
+                run_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutboxItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    health_api_health_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
                 };
             };
         };
