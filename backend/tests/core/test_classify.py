@@ -147,9 +147,13 @@ def test_llm_hook_is_called_in_live_mode(monkeypatch: pytest.MonkeyPatch) -> Non
         seen.append(reason)
 
     monkeypatch.setattr(classify, "_llm_extract", spy)
+    monkeypatch.setenv("EXTRACT_MODE", "llm")
     _understand("CMP-00165", mode="live")
-    _understand("CMP-00165", mode="batch")  # confident, no conflict: not called
-    assert seen == ["live"]
+    _understand("CMP-00165", mode="batch")  # LLM-first: batch reads with the LLM too
+    assert seen == ["live", "llm_first"]
+    monkeypatch.setenv("EXTRACT_MODE", "regex")
+    _understand("CMP-00165", mode="live")  # the regex path never calls it
+    assert seen == ["live", "llm_first"]
 
 
 # --- regex clues -----------------------------------------------------------------------------------------

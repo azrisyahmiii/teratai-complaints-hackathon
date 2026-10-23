@@ -6,3 +6,4 @@ import pytest
 @pytest.fixture(autouse=True)
 def _template_replies(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("REPLY_MODE", "template")
+    monkeypatch.setenv("EXTRACT_MODE", "regex")

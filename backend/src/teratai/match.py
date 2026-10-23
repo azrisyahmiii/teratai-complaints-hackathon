@@ -11,6 +11,7 @@ import time
 from collections.abc import Callable
 from datetime import date
 from decimal import Decimal
+from difflib import SequenceMatcher
 
 from teratai import classify, config, data, extract, investigate, tools
 from teratai.data import Txn
@@ -106,14 +107,47 @@ def _tokens(s: str) -> set[str]:
     return {w for w in _WORD.findall(s.lower()) if len(w) >= 3}
 
 
+def _squash(s: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", s.lower())
+
+
+def party_similarity(merchant: str, span: str) -> float:
+    """0..1 similarity of a named payee / merchant span to a candidate's merchant.
+
+    1.0 when one contains the other ignoring case, spaces and punctuation ("Go Ride" / GoRide), or they share a
+    significant word. Otherwise the best edit-distance ratio of the whole squash or of a word pair, so a typo
+    ("gamevalt" / GameVault) scores high and an unrelated name low (robustness review §5.1.4).
+    """
+    m, s = _squash(merchant), _squash(span)
+    if not m or not s:
+        return 0.0
+    if (len(s) >= 4 and s in m) or (len(m) >= 4 and m in s):
+        return 1.0
+    mt = {w for w in _tokens(merchant) if w not in _NAME_NOISE}
+    st = {w for w in _tokens(span) if w not in _NAME_NOISE}
+    if mt & st:
+        return 1.0
+    best = SequenceMatcher(None, m, s).ratio()
+    for a in mt:
+        for b in st:
+            if len(a) >= 4 and len(b) >= 4:
+                best = max(best, SequenceMatcher(None, a, b).ratio())
+    return best
+
+
 def counterparty_hit(merchant: str, clue: str | None, text: str) -> bool:
     """Case-insensitive token / substring hit of a candidate's merchant against the clue, else the text.
 
-    `paycoin` is a hit for `PAYCOIN LTD`; `shalini` for `Shalini a/p Nair`. Name particles never count.
+    `paycoin` is a hit for `PAYCOIN LTD`; `shalini` for `Shalini a/p Nair`. Name particles never count. The clue
+    also hits when it is close by edit distance (a typo or different spacing), see `party_similarity`.
     """
     m = merchant.lower().strip()
     if not m:
         return False
+    if clue is not None and not extract.is_name_span(clue):
+        clue = None  # an account phrase or a date word is not a name
+    if clue and party_similarity(merchant, clue) >= config.PARTY_HIT_RATIO:
+        return True
     sources = [clue, text] if clue else [text]
     sig = {w for w in _tokens(m) if w not in _NAME_NOISE}
     for src in sources:
@@ -163,8 +197,21 @@ def _amount_filter(issue: Issue) -> tuple[Decimal | None, Decimal | None]:
         return None, None
     if issue.amount_approx:
         floor = config.AMOUNT_APPROX_MIN_MYR
-        return issue.amount, max(issue.amount * config.AMOUNT_APPROX_PCT, floor)
+        return issue.amount, max(issue.amount * config.AMOUNT_APPROX_PCT, floor, rounding_half_step(issue.amount))
     return issue.amount, None
+
+
+def rounding_half_step(amount: Decimal) -> Decimal:
+    """Half the rounding step an approximate round amount implies: 4400 ("4.4k") was rounded to the nearest 100,
+    so the true amount lies within 50; 2000 within 500. Non-round amounts (46.66) imply no rounding: 0."""
+    if amount != amount.to_integral_value() or amount < 100:
+        return Decimal(0)
+    step = Decimal(1)
+    n = int(amount)
+    while n % 10 == 0 and step < config.AMOUNT_ROUNDING_MAX_STEP:
+        n //= 10
+        step *= 10
+    return step / 2 if step > 1 else Decimal(0)
 
 
 def _survivors(row: ComplaintRow, issue: Issue, window: DateWindow) -> list[Txn]:
@@ -307,16 +354,21 @@ def _related(txn_id: str, sibling: Txn | None) -> dict[str, str]:
 
 def _named_party(issue: Issue, text: str) -> str | None:
     """The payee / merchant the complaint names: the extractor's verbatim span, else a regex span ("to Ahmad")."""
-    return issue.counterparty or extract.counterparty_span(text)
+    for span in (issue.counterparty, extract.counterparty_span(text)):
+        if extract.is_name_span(span):  # an account phrase / number / date word is never a name
+            return span
+    return None
 
 
 def _party_mismatch(t: Txn, issue: Issue, text: str) -> bool:
-    """The complaint names a payee / merchant and this transaction's counterparty is not it. Only the named
-    span is compared (not the whole text), so one stray word cannot rescue a wrong transaction."""
+    """The complaint names a payee / merchant and this transaction's counterparty is clearly not it. Only the
+    named span is compared (not the whole text), so one stray word cannot rescue a wrong transaction. A soft
+    signal: a typo or different spacing is a hit (+3), a middling similarity is merely not a hit, and only a clear
+    mismatch (similarity < PARTY_VETO_RATIO) vetoes the transaction."""
     if issue.category == "FEE_DISPUTE":
         return False  # a fee has no payee: it is matched on fee type + month
     party = _named_party(issue, text)
-    return bool(party) and not counterparty_hit(t.merchant, party, "")
+    return party is not None and party_similarity(t.merchant, party) < config.PARTY_VETO_RATIO
 
 
 def _fee_fits(t: Txn, issue: Issue, window: DateWindow, text: str) -> bool:
@@ -371,6 +423,62 @@ def _validate_investigator(txn_id: str, row: ComplaintRow, issue: Issue, window:
     return not _party_mismatch(t, issue, text)
 
 
+def _candidates(
+    row: ComplaintRow, issue: Issue, window: DateWindow, text: str
+) -> tuple[list[Candidate], dict[str, Txn | None]]:
+    """Scored candidates, best first, and the earlier identical charge of each duplicate candidate."""
+    siblings: dict[str, Txn | None] = {}
+    if issue.category == "FEE_DISPUTE":
+        cands = _fee_candidates(row, issue, window, text)
+    elif issue.category == "DUPLICATE_CHARGE":
+        siblings = _duplicate_candidates(row, issue, window)
+        cands = [_score(data.txn(tid), issue, window, text) for tid in siblings]
+    else:
+        surv = _survivors(row, issue, window)
+        if not surv and _is_round(issue):
+            # The customer gave a round figure ("600 ringgit" for RM577.87) with no "about": retry at the rounding
+            # tolerance. These candidates carry `amount_rounded`, which is NOT a discriminating signal, so one of
+            # them wins only on a payee name or card digits, never on its rounded amount alone.
+            relaxed = issue.model_copy(update={"amount_approx": True})
+            cands = []
+            for t in _survivors(row, relaxed, window):
+                c = _score(t, relaxed, window, text)
+                b = {("amount_rounded" if k == "amount_approx" else k): v for k, v in c.breakdown.items()}
+                cands.append(Candidate(txn_id=c.txn_id, score=c.score, breakdown=b))
+        else:
+            cands = [_score(t, issue, window, text) for t in surv]
+    return _rank(cands), siblings
+
+
+def _is_round(issue: Issue) -> bool:
+    """A whole amount of at least RM100 that is a multiple of 50: a figure people round to."""
+    a = issue.amount
+    return (
+        a is not None
+        and not issue.amount_approx
+        and a >= 100
+        and a == a.to_integral_value()
+        and int(a) % 50 == 0
+        and issue.category in ("FAILED_TRANSFER", "SCAM_TRANSFER", "UNAUTHORISED_CARD", "ATM_NOT_DISPENSED")
+    )
+
+
+def probe_unique(row: ComplaintRow, issue: Issue, window: DateWindow) -> str | None:
+    """The txn id the matcher would pick for `issue` without the investigator, or None (none / ambiguous / vetoed).
+
+    Used to settle a category disagreement (SPEC section 4.2 step 3, evidence consistency): the category under which
+    the complaint's clues single out one transaction is the better reading. Pure, no events.
+    """
+    if issue.category == "SERVICE_QUALITY":
+        return None
+    text = f"{row.subject} {row.text}"
+    cands, _ = _candidates(row, issue, window, text)
+    status, txn_id = _decide(cands)
+    if status != "UNIQUE" or txn_id is None or _party_mismatch(data.txn(txn_id), issue, text):
+        return None
+    return txn_id
+
+
 def _run(row: ComplaintRow, u: Understanding, window: DateWindow, emit: Emit) -> tuple[MatchResult, str | None]:
     """The match, and the reason (if any) it was held back from UNIQUE for the trace."""
     issue = u.issues[0]
@@ -393,15 +501,7 @@ def _run(row: ComplaintRow, u: Understanding, window: DateWindow, emit: Emit) ->
     ):
         return result("WRONG_CUSTOMER", None, [], {}), "card_not_owned"
 
-    siblings: dict[str, Txn | None] = {}
-    if issue.category == "FEE_DISPUTE":
-        cands = _fee_candidates(row, issue, window, text)
-    elif issue.category == "DUPLICATE_CHARGE":
-        siblings = _duplicate_candidates(row, issue, window)
-        cands = [_score(data.txn(tid), issue, window, text) for tid in siblings]
-    else:
-        cands = [_score(t, issue, window, text) for t in _survivors(row, issue, window)]
-    cands = _rank(cands)
+    cands, siblings = _candidates(row, issue, window, text)
     status, txn_id = _decide(cands)
     reason: str | None = None
     if status == "UNIQUE" and txn_id and _party_mismatch(data.txn(txn_id), issue, text):

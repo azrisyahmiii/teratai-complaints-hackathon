@@ -31,17 +31,18 @@ from numpy.typing import NDArray
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report
-from sklearn.model_selection import StratifiedKFold, cross_val_predict
+from sklearn.model_selection import GroupKFold, StratifiedKFold, cross_val_predict
 from sklearn.pipeline import FeatureUnion, Pipeline
 
-from teratai import config, data, extract, lang
+from teratai import config, data, dates, extract, lang
 from teratai.models import Category, ComplaintRow, Emit, Mode, StageEvent, Understanding
 
 TARGET_ACCEPTED_ACCURACY = 0.99  # accepted (conf >= tau) OOF items must be at least this accurate
 MAX_BELOW_TAU_SHARE = 0.10  # at most this share of items may fall below tau (goes to the LLM)
 SCAM_PRECEDENCE_CONF = 0.95  # step 4: scam cue beats FAILED/UNAUTH labels below this confidence
 FOLDS = 5
-MODEL_VERSION = 2  # bump when features or hyper-parameters change, so a stale joblib is retrained
+GROUP_COSINE = 0.7  # complaints at least this similar (digits masked) share a template cluster: kept in one fold
+MODEL_VERSION = 3  # bump when features or hyper-parameters change, so a stale joblib is retrained
 
 NDF = NDArray[np.float64]
 
@@ -189,6 +190,22 @@ def choose_tau(conf: NDF, correct: NDArray[np.bool_]) -> tuple[float, dict[str, 
     }
 
 
+def template_groups(texts: list[str], threshold: float = GROUP_COSINE) -> NDArray[np.int_]:
+    """Cluster label per text: greedy leader clustering on cosine similarity of digit-masked word TF-IDF.
+
+    The training texts come from templates, so a plain stratified CV scores a text whose twin sits in the training
+    fold. Group K-fold over these clusters holds whole templates out, the honest estimate (robustness review 5.1.8).
+    """
+    masked = [re.sub(r"\d", "0", t.lower()) for t in texts]
+    x = TfidfVectorizer(analyzer="word", ngram_range=(1, 2), sublinear_tf=True).fit_transform(masked)
+    sim = (x @ x.T).toarray()
+    group = np.full(len(texts), -1, dtype=int)
+    for i in range(len(texts)):
+        if group[i] < 0:
+            group[(sim[i] >= threshold) & (group < 0)] = i
+    return group
+
+
 def train() -> Artifact:
     """Fit on all labelled complaints, compute 5-fold OOF probabilities and tau, persist to VAR_DIR."""
     t0 = time.perf_counter()
@@ -203,6 +220,21 @@ def train() -> Artifact:
     conf = oof.max(axis=1)
     correct = pred == y_arr
     tau, tau_stats = choose_tau(conf, correct)
+    # Honest estimate: whole template clusters held out. tau never drops below the in-template value, so a
+    # template-leaking CV can only make the guard stricter, not looser.
+    groups = template_groups(texts)
+    g_oof: NDF = cross_val_predict(_build_pipeline(), texts, y_arr, groups=groups, cv=GroupKFold(n_splits=FOLDS), method="predict_proba")
+    g_pred = np.array(classes)[g_oof.argmax(axis=1)]
+    g_correct = g_pred == y_arr
+    g_tau, g_stats = choose_tau(g_oof.max(axis=1), g_correct)
+    tau_stats = {
+        **tau_stats,
+        "group_oof_accuracy": float(g_correct.mean()),
+        "group_clusters": float(len(set(groups.tolist()))),
+        "tau_group": g_tau,
+        "group_accepted_accuracy": g_stats["accepted_accuracy"],
+    }
+    tau = max(tau, g_tau)
     art = Artifact(
         version=MODEL_VERSION,
         fingerprint=_fingerprint(ids, texts, y),
@@ -293,15 +325,14 @@ def decide_category(
 
 
 def _needs_llm(mode: Mode, probs: NDF, scam_cue: bool, classes: list[str], threshold: float) -> str | None:
-    """Why the LLM tier should run (SPEC §4.2 Tier 2), or None. Live: always; batch: low conf or tier conflict."""
-    if mode == "live":
-        return "live"
-    label = classes[int(probs.argmax())]
-    if float(probs.max()) < threshold:
-        return "low_confidence"
-    if scam_cue and label != "SCAM_TRANSFER":
-        return "tier_conflict"
-    return None
+    """Why the LLM tier should run (robustness review section 0), or None.
+
+    `EXTRACT_MODE=llm` (default): the LLM reads every complaint, batch and live alike. `EXTRACT_MODE=regex`: never
+    (tests, and the outage fallback): the classifier and the regex clues stand alone.
+    """
+    if config.extract_mode() == "regex":
+        return None
+    return "live" if mode == "live" else "llm_first"
 
 
 def _llm_extract(
@@ -312,20 +343,90 @@ def _llm_extract(
     return extract.llm_issue(row, emit)
 
 
+# When the two readers disagree and no clue singles out a transaction under either category, prefer the category
+# whose no-match outcome is INVESTIGATE (SPEC section 6): it can never pay a wrongful refund or miss a fraud.
+_SAFETY_ORDER: tuple[str, ...] = ("SCAM_TRANSFER", "UNAUTHORISED_CARD")
+
+
+def _resolve_disagreement(
+    row: ComplaintRow, rx: extract.Issue, first: extract.Issue, detail: extract.LLMDetail | None, text: str,
+    injection: bool, cls_cat: str, llm_cat: str, probs: NDF, classes: list[str], threshold: float, scam_cue: bool,
+) -> tuple[Category, str, str]:
+    """(category, source, how) for a classifier / LLM disagreement.
+
+    1. scam precedence: a scam cue and either reader says SCAM_TRANSFER -> SCAM_TRANSFER.
+    2. the category under which the merged clues single out ONE transaction (SPEC section 4.2 step 3).
+    3. the safe default (INVESTIGATE-first), else the classifier when confident, else the LLM.
+    """
+    from teratai import match  # lazy: match imports this module
+
+    if scam_cue and "SCAM_TRANSFER" in (cls_cat, llm_cat):
+        return "SCAM_TRANSFER", "rules", "scam_precedence"
+    cls_conf = float(probs[classes.index(cls_cat)]) if cls_cat in classes else 0.0
+    unique: dict[str, str | None] = {}
+    for cat in (cls_cat, llm_cat):
+        issue = extract.merge_issue(rx.model_copy(update={"category": cat}), first, text, cat, injection,  # type: ignore[arg-type]
+                                    detail, row.received_at)
+        window = dates.resolve_window(issue.date_phrase, row.received_at)
+        unique[cat] = match.probe_unique(row, issue, window)
+    cls_ok, llm_ok = unique[cls_cat] is not None, unique[llm_cat] is not None
+    if cls_ok != llm_ok:
+        return (cls_cat, "classifier", "unique_match") if cls_ok else (llm_cat, "llm", "unique_match")  # type: ignore[return-value]
+    how = "both_unique" if cls_ok else "safe_default"
+    for cat in _SAFETY_ORDER:
+        if cat in (cls_cat, llm_cat):
+            return cat, ("classifier" if cat == cls_cat else "llm"), how  # type: ignore[return-value]
+    if cls_conf >= threshold:
+        return cls_cat, "classifier", how  # type: ignore[return-value]
+    return llm_cat, "llm", how  # type: ignore[return-value]
+
+
 def _merge_llm(
     row: ComplaintRow, base: Understanding, llm: extract.LLMExtraction, probs: NDF, classes: list[str],
     threshold: float,
-) -> tuple[Understanding, str]:
-    """Fold the LLM answer into the understanding: category per decide_category, clues merged, language stays code."""
+) -> tuple[Understanding, str, dict[str, Any] | None]:
+    """Fold the LLM answer into the understanding: LLM primary, classifier cross-check, code verifies every clue.
+
+    Agreement -> accept. Disagreement -> `_resolve_disagreement`. Then scam precedence on the result (SPEC step 4).
+    Returns the understanding, the decision reason and the disagreement record (None when they agree).
+    """
     first = llm.issues[0]
+    detail = llm.details[0] if llm.details else None
     injection = base.injection_suspected or llm.injection_suspected
-    category, source, reason = decide_category(probs, classes, base.scam_cue, threshold, llm_label=first.category)
     text = f"{row.subject} {row.text}".strip()
-    issue = extract.merge_issue(extract.regex_issue(row, category), first, text, category, injection)
+    cls_cat, llm_cat = base.issues[0].category, first.category
+    rx = extract.regex_issue(row, cls_cat)
+    disagreement: dict[str, Any] | None = None
+    if cls_cat == llm_cat:
+        category, source, how = cls_cat, "rules" if base.source == "rules" else "llm", "agree"
+        reason = f"LLM and classifier agree: {category}"
+    else:
+        category, source, how = _resolve_disagreement(
+            row, rx, first, detail, text, injection, cls_cat, llm_cat, probs, classes, threshold, base.scam_cue
+        )
+        cls_conf = float(probs[classes.index(cls_cat)]) if cls_cat in classes else 0.0
+        disagreement = {
+            "classifier": cls_cat,
+            "classifier_conf": round(cls_conf, 4),
+            "llm": llm_cat,
+            "resolved": category,
+            "by": how,
+        }
+        reason = f"classifier {cls_cat} vs LLM {llm_cat}: {category} by {how}"
+    chosen_conf = float(probs[classes.index(category)]) if category in classes else 0.0
+    if base.scam_cue and category in ("FAILED_TRANSFER", "UNAUTHORISED_CARD") and chosen_conf < SCAM_PRECEDENCE_CONF:
+        category, source = "SCAM_TRANSFER", "rules"
+        reason += f"; scam cue overrides (conf {chosen_conf:.2f} < {SCAM_PRECEDENCE_CONF})"
+    issue = extract.merge_issue(
+        extract.regex_issue(row, category), first, text, category, injection, detail, row.received_at
+    )
+    language, language_reason = lang.reply_language(row, llm.language)
     merged = base.model_copy(
         update={
             "issues": [issue],
             "source": source,
+            "language": language,
+            "language_reason": language_reason,
             # Not a complaint when the rules OR the LLM say so. Either verdict only changes the reply (a polite
             # generic acknowledgement, and only when the outcome is INFO_ONLY): policy never reads this flag.
             "is_complaint": base.is_complaint and llm.is_complaint,
@@ -333,7 +434,7 @@ def _merge_llm(
             "top3": _top3(probs, classes, first=category),
         }
     )
-    return merged, reason
+    return merged, reason, disagreement
 
 
 def understand(row: ComplaintRow, mode: Mode, emit: Emit) -> Understanding:
@@ -355,12 +456,12 @@ def understand(row: ComplaintRow, mode: Mode, emit: Emit) -> Understanding:
         scam_cue=t0r.scam_cue,
     )
     llm_reason = _needs_llm(mode, probs, t0r.scam_cue, art.classes, threshold)
-    result, llm_called, llm_note = base, False, None
+    result, llm_called, llm_note, disagreement = base, False, None, None
     if llm_reason is not None:
         llm = _llm_extract(row, base, llm_reason, emit)
         llm_called = llm is not None
         if llm is not None:
-            result, reason = _merge_llm(row, base, llm, probs, art.classes, threshold)
+            result, reason, disagreement = _merge_llm(row, base, llm, probs, art.classes, threshold)
             llm_note = {
                 "category": llm.issues[0].category,
                 "language": llm.language,
@@ -380,10 +481,12 @@ def understand(row: ComplaintRow, mode: Mode, emit: Emit) -> Understanding:
                 "classifier_top3": _top3(probs, art.classes),
                 "tau": round(threshold, 4),
                 "oof_probabilities": held_out,
+                "extract_mode": config.extract_mode(),
                 "llm_reason": llm_reason,
                 "llm_used": result.source == "llm",
                 "llm_called": llm_called,
                 "llm": llm_note,
+                "category_disagreement": disagreement,
                 "degraded": llm_reason is not None and not llm_called,
                 "clues": result.issues[0].model_dump(mode="json"),
                 "language": result.language,
@@ -426,6 +529,11 @@ def _cv_report() -> None:
     print(f"decision errors: {len(errors)}  e.g. {errors[:8]}")
     fp = sum(not tier0(data.complaint(i)).is_complaint for i in ids)
     print(f"labelled complaints flagged is_complaint=False: {fp}/{len(ids)}")
+    print(
+        f"group K-fold by template ({art.stats['group_clusters']:.0f} clusters, cosine {GROUP_COSINE}): "
+        f"accuracy {art.stats['group_oof_accuracy']:.4f}; tau_group {art.stats['tau_group']:.4f} "
+        f"(accepted accuracy {art.stats['group_accepted_accuracy']:.4f}); tau used = max(in-template, group) = {art.tau:.4f}"
+    )
     print(f"train time (CV + final fit): {art.stats['train_seconds']:.1f}s")
 
 

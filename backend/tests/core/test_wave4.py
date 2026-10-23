@@ -307,6 +307,7 @@ def test_llm_verdict_is_carried_into_understanding(
         injection_suspected=False, attempts=1,
     )  # fmt: skip
     monkeypatch.setattr(classify, "_llm_extract", lambda *_a, **_k: fake)
+    monkeypatch.setenv("EXTRACT_MODE", "llm")
     u = classify.understand(row, "live", _noop)
     assert u.is_complaint is want
 

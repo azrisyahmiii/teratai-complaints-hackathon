@@ -16,11 +16,16 @@ from datetime import date, datetime, timedelta
 
 from teratai.config import MATCH_WINDOW_DAYS
 from teratai.models import DateWindow
+from teratai.textnorm import normalise
 
 # Weekday index follows date.weekday(): Monday = 0.
 _WEEKDAYS: dict[str, int] = {
     "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3, "friday": 4, "saturday": 5, "sunday": 6,
     "isnin": 0, "selasa": 1, "rabu": 2, "khamis": 3, "jumaat": 4, "sabtu": 5, "ahad": 6,
+    # Short forms used in chat. The rules below only read a weekday after last/on/this/hari or before lepas,
+    # so "sat" / "sun" / "wed" as ordinary words are not read as dates.
+    "mon": 0, "tue": 1, "tues": 1, "wed": 2, "thu": 3, "thur": 3, "thurs": 3, "fri": 4, "sat": 5, "sun": 6,
+    "sab": 5, "jum": 4, "rab": 2, "kha": 3, "isn": 0, "sel": 1,
 }  # fmt: skip
 _MONTHS: dict[str, int] = {
     "january": 1, "february": 2, "march": 3, "april": 4, "may": 5, "june": 6, "july": 7,
@@ -130,6 +135,30 @@ def _r_recent_weekday(m: re.Match[str], today: date) -> _Span | None:
     return _day(_recent_weekday(_WEEKDAYS[m["wd"].lower()], today))
 
 
+def _r_weekday_last_week(m: re.Match[str], today: date) -> _Span | None:
+    """"Tuesday last week": that weekday in the calendar week before this one."""
+    monday = today - timedelta(days=today.weekday())
+    return _day(monday - timedelta(days=7) + timedelta(days=_WEEKDAYS[m["wd"].lower()]))
+
+
+def _r_weeks_ago(m: re.Match[str], today: date) -> _Span | None:
+    n = int(m["n"])
+    if not 0 < n <= 8:
+        return None
+    centre = today - timedelta(days=7 * n)
+    return centre - timedelta(days=3), centre + timedelta(days=3), None  # "2 weeks ago" is fuzzy
+
+
+def _r_day_of_month(m: re.Match[str], today: date) -> _Span | None:
+    """"15hb": the most recent 15th (this month, or last month when it has not come yet)."""
+    dd = int(m["d"])
+    d = _safe_date(today.year, today.month, dd)
+    if d is None or d > today + timedelta(days=1):
+        prev = today.replace(day=1) - timedelta(days=1)
+        d = _safe_date(prev.year, prev.month, dd)
+    return _day(d) if d else None
+
+
 def _r_last_week(_m: re.Match[str], today: date) -> _Span | None:
     return today - timedelta(days=13), today - timedelta(days=1), None
 
@@ -194,7 +223,12 @@ _RULES: list[_Rule] = [
         _offset(0),
     ),
     _rule(r"\b(?P<n>\d{1,2})\s+(?:days? ago|hari (?:lepas|yang lalu|lalu))", _EXACT, _r_n_days_ago),
+    _rule(r"\b(?P<n>\d{1,2})\s*(?:weeks?|minggu)\s+(?:ago|lepas|lalu)\b", _RANGE, _r_weeks_ago),
+    _rule(r"(?<![\d./-])(?P<d>\d{1,2})\s?hb\b", _EXACT, _r_day_of_month),
     # Weekdays: "last Friday", "hari Selasa lepas" / "Selasa lepas" -> strictly before today.
+    _rule(
+        rf"\b{_WD}\s+(?:last\s+week|minggu\s+(?:yang\s+)?(?:lepas|lalu))\b", _EXACT, _r_weekday_last_week
+    ),
     _rule(rf"\blast\s+{_WD}\b", _EXACT, _r_last_weekday),
     _rule(rf"\b(?:hari\s+)?{_WD}\s+(?:yang\s+)?lepas\b", _EXACT, _r_last_weekday),
     # "on Friday", "hari Jumaat", "this Friday", "Jumaat ini" -> most recent on or before today.
@@ -214,6 +248,7 @@ _RULES: list[_Rule] = [
 def _scan(text: str, received: date) -> tuple[str, _Span] | None:
     """Best phrase in `text`: most specific class, then earliest, then longest."""
     best: tuple[tuple[int, int, int], str, _Span] | None = None
+    text = normalise(text)  # clue-only: SMS short forms ("lps", "smlm") become words the rules know
     for rule in _RULES:
         for m in rule.pattern.finditer(text):
             span = rule.resolve(m, received)
@@ -223,6 +258,37 @@ def _scan(text: str, received: date) -> tuple[str, _Span] | None:
             if best is None or key < best[0]:
                 best = (key, m.group(0), span)
     return None if best is None else (best[1], best[2])
+
+
+_NUMBER_WORDS: dict[str, int] = {
+    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+    "satu": 1, "dua": 2, "tiga": 3, "empat": 4, "lima": 5, "enam": 6, "tujuh": 7, "lapan": 8, "sembilan": 9,
+    "sepuluh": 10,
+}  # fmt: skip
+
+
+def phrase_supported(canonical: str, text: str) -> bool:
+    """A canonical date form (the model's closed vocabulary) is backed by the text.
+
+    Every weekday, month and number it names must occur in the text in some surface form (English or Malay name,
+    short form, "11/7", a number word). Relative words with none of these ("yesterday") are backed by nothing more
+    than the caller's check that the customer's own words exist in the text.
+    """
+    canon = canonical.lower()
+    norm = normalise(text).lower()
+    toks = re.findall(r"[^\W_]+", norm)
+    want_wd = {_WEEKDAYS[t] for t in re.findall(r"[^\W\d_]+", canon) if t in _WEEKDAYS}
+    have_wd = {_WEEKDAYS[t] for t in toks if t in _WEEKDAYS}
+    if not want_wd <= have_wd:
+        return False
+    want_mon = {_MONTHS[t] for t in re.findall(r"[^\W\d_]+", canon) if t in _MONTHS}
+    have_mon = {_MONTHS[t] for t in toks if t in _MONTHS}
+    have_mon |= {int(m) for m in re.findall(r"\b\d{1,2}\s?[/.-]\s?(\d{1,2})\b", norm)}
+    if not want_mon <= have_mon:
+        return False
+    nums = set(re.findall(r"\d+", norm)) | {str(_NUMBER_WORDS[t]) for t in toks if t in _NUMBER_WORDS}
+    nums |= {n.lstrip("0") for n in nums}
+    return all(n.lstrip("0") in nums for n in re.findall(r"\d+", canon))
 
 
 def find_date_phrase(text: str) -> str | None:
