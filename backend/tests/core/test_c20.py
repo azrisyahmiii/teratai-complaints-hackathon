@@ -1,10 +1,11 @@
 """C20 harness-evaluation fixes (docs/dev/reviews/2026-10-23-harness-evaluation.md §9)."""
 
 from datetime import date
+from pathlib import Path
 
 import pytest
 
-from teratai import extract, investigate
+from teratai import evaluate, extract, investigate
 from teratai.models import ComplaintRow, DateWindow, Issue, StageEvent
 from teratai.pipeline import process_complaint
 
@@ -66,3 +67,23 @@ def test_full_card_number_complaint_is_not_wrong_customer() -> None:
     clues = next(e.payload["clues"] for e in events if e.stage == "understand")
     assert clues["card_last4"] == "3691"
     assert all((e.payload or {}).get("status") != "WRONG_CUSTOMER" for e in events if e.stage == "match")
+
+
+# --- §9 #7: the outage path (LLM unreachable / replay cache empty) was never exercised by an eval -----------------
+def test_llm_outage_every_messy_row_gets_a_checked_template_reply(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # DEMO_MODE=cached with an empty cache = every LLM call misses: extract, investigator and reply all degrade.
+    monkeypatch.setenv("DEMO_MODE", "cached")
+    monkeypatch.setenv("LLM_CACHE_PATH", str(tmp_path / "empty.sqlite"))
+    monkeypatch.setenv("EXTRACT_MODE", "llm")
+    monkeypatch.setenv("REPLY_MODE", "llm")
+    monkeypatch.setenv("INVESTIGATOR", "on")
+    rows = evaluate.load_rows(Path(__file__).parent / "fixtures" / "messy_dev.csv")
+    for r in rows:
+        events: list[StageEvent] = []
+        d = process_complaint(r, "live", events.append)
+        reply = [e for e in events if e.stage == "reply"][-1].payload
+        assert reply["source"] == "template" and d.check_ok, r.complaint_id
+        assert d.to_csv_row()["reply_text"].strip() or "wrong_customer" in d.flags, r.complaint_id
+        assert any((e.payload or {}).get("degraded") for e in events), r.complaint_id
