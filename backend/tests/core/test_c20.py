@@ -131,3 +131,24 @@ def test_other_declines_still_offer_fmos() -> None:
 
     d = process_complaint(data.complaint(_first("ATM_NOT_DISPENSED", "DECLINE", "EN")), "eval")
     assert "FMOS" in render(d.facts) and "BNMLINK" in render(d.facts)
+
+
+# --- §9 #8: a negated Malay refund is a refusal, not a promise (1 false positive in 284 replies) ------------------
+@pytest.mark.parametrize(
+    "sentence, flagged",
+    [
+        ("Oleh itu, pihak bank tidak akan membuat bayaran balik baharu.", False),
+        ("Pihak bank tidak akan membuat sebarang bayaran balik.", False),
+        ("Kami tidak dapat memberikan bayaran balik.", False),
+        ("Pihak bank akan membuat bayaran balik kepada anda.", True),
+        ("Kami tidak sabar untuk membuat bayaran balik kepada anda.", True),  # "can't wait to refund": a promise
+        ("We cannot confirm the date, but we will refund you.", True),
+    ],
+)
+def test_negated_malay_refund_is_not_a_promise(sentence: str, flagged: bool) -> None:
+    from teratai import check, data
+
+    facts = process_complaint(data.complaint(_first("FAILED_TRANSFER", "DECLINE", "MS")), "eval").facts
+    assert facts.outcome == "DECLINE"
+    issues = check.check_reply(sentence, facts).issues
+    assert any(i.code == "OUTCOME" for i in issues) is flagged

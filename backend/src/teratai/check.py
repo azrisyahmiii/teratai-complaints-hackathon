@@ -38,7 +38,8 @@ AMOUNT_TOLERANCE = Decimal("0.005")
 # --- negation: a refusal must directly govern the verb, inside the same sentence --------------------------------
 # "unable to refund", "has not been refunded", "tidak dapat memulangkan": the negation, then only auxiliaries, then the verb.
 NEGATION_WORDS = r"no|not|never|cannot|can't|unable|won't|wouldn't|couldn't|tidak|tak|belum|bukan|tiada"
-NEGATION_AUX = r"yet|be|been|being|get|got|to|able|going|ever|dapat|boleh|akan|lagi"
+# MS light verbs + determiners: "tidak akan membuat (sebarang) bayaran balik" is a refusal, not a promise
+NEGATION_AUX = r"yet|be|been|being|get|got|to|able|going|ever|dapat|boleh|akan|lagi|membuat|memberi|memberikan|sebarang|apa-apa"
 _NEGATED_TAIL = re.compile(rf"\b(?:{NEGATION_WORDS})\b(?:\s+(?:{NEGATION_AUX}))*\s*$", re.IGNORECASE)
 _SENTENCE_END = re.compile(r"[.!?;](?=\s|$)|\n")
 _FUTURE_TAIL = re.compile(r"\b(?:will|shall|would|going\s+to|akan)(?:\s+be)?\s*$", re.IGNORECASE)
