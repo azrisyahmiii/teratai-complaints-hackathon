@@ -1,5 +1,8 @@
 # Core tasks (Dev A, branch `feat/core`)
 
+> **Dev B / integrator: start with [core-handoff.md](core-handoff.md).** It covers what this branch contains, how to
+> merge it, and what Platform builds next.
+
 Owns the accuracy path: data → understand → match → decide → reply → check → batch. File globs are in
 [contracts.md §4](contracts.md). Read SPEC §1, §3, §4, §6, §12 and DEMO §1 and §3 before starting.
 
