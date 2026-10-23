@@ -38,7 +38,7 @@ from teratai.models import (
 )
 from teratai.policy import earlier_identical, money
 from teratai.templates import en as _en
-from teratai.templates import fmt_date, render, state_of, template_key, who
+from teratai.templates import fmt_date, render, state_of, template_key, waiver_reason, who
 from teratai.templates import money as fmt_money
 from teratai.templates import ms as _ms
 
@@ -97,6 +97,14 @@ def _fee(t: data.Txn, d: Decision, ids: Ids, amounts: Amounts, dates: Dates) -> 
         amounts["charged"], amounts["due"] = money(charged), money(due)
         if charged > due:
             amounts["difference"] = money(charged - due)
+        if due == 0:  # say why (templates.WAIVER_REASONS): a waiver rule fired, or the fee isn't on this product
+            code = d.inputs.get("fee_code", "")
+            if "waived" not in d.inputs:
+                ids["waiver"], ids["product"] = "not_applicable", d.inputs.get("product", "")
+            elif code == "DEBIT_ANNUAL":
+                ids["waiver"] = "age"
+            elif code.startswith("CC_ANNUAL"):
+                ids["waiver"] = "first_year"
 
 
 _FILL: dict[str, Callable[..., None]] = {
@@ -203,7 +211,8 @@ SITUATIONS: dict[str, str] = {
     "Be empathetic.",
     "FEE_DISPUTE.REFUND": "The customer was charged more fee than is due on the account. The bank will refund the "
     "difference.",
-    "FEE_DISPUTE.REFUND.waived": "No fee was due on this account (waived), so the bank will refund the whole fee.",
+    "FEE_DISPUTE.REFUND.waived": "No fee was due on this account, so the bank will refund the whole fee. State the "
+    "reason given in `fee_waiver_reason`.",
     "FEE_DISPUTE.DECLINE": "The fee charged matches the fee schedule for the account. There is no refund.",
     "SERVICE_QUALITY.INFO_ONLY": "The customer complained about service. Apologise, say the feedback is recorded and "
     "passed to the team concerned, who will respond within `working_days_to_resolve` working days. No money is "
@@ -300,6 +309,8 @@ def fact_sheet_text(facts: FactSheet) -> str:
         lines.append(f"{_QUANTITY_LABELS.get(k, k)}: {fmt_money(amount)}")
     for k, day in facts.dates.items():
         lines.append(f"{_DATE_LABELS.get(k, k + '_date')}: {fmt_date(day, lang)}")
+    if key == "FEE_DISPUTE.REFUND.waived":
+        lines.append(f"fee_waiver_reason: {waiver_reason(facts)}")
     lines.append(f"working_days_to_resolve: {facts.sla_days}")
     if facts.outcome == "INVESTIGATE":
         lines.append(f"working_days_between_updates: {config.SCAM_UPDATE_WORKING_DAYS}")

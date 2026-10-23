@@ -20,6 +20,14 @@ REDRESS = (
 REDRESS_BNM = "Jika anda tidak berpuas hati dengan keputusan ini, anda boleh menghubungi BNMLINK di 1-300-88-5465."
 SCAM_HELP = "Sila hubungi juga National Scam Response Centre (NSRC) di 997 dan, jika dinasihatkan, buat laporan polis."
 REFUND_TIME = "dalam masa {sla_days} hari bekerja"
+WAIVER_REASONS = {
+    "age": "Tiada yuran sepatutnya dikenakan ke atas akaun anda kerana yuran tahunan kad debit dikecualikan bagi "
+    "pelanggan berumur {waiver_age} tahun ke atas",
+    "first_year": "Tiada yuran sepatutnya dikenakan ke atas akaun anda kerana yuran tahunan dikecualikan bagi tahun "
+    "pertama kad kredit anda",
+    "not_applicable": "Tiada yuran sepatutnya dikenakan kerana yuran ini tidak terpakai bagi akaun {product}",
+    "": "Tiada yuran sepatutnya dikenakan ke atas akaun anda",
+}
 
 TEXTS: dict[str, str] = {
     "DUPLICATE_CHARGE.REFUND": OPEN
@@ -76,8 +84,8 @@ TEXTS: dict[str, str] = {
     + "Kami telah menyemak transaksi yuran {txn} sebanyak {charged} pada {date}. Yuran yang sepatutnya dikenakan ialah "
     "{due}. Beza sebanyak {refund} akan dikreditkan semula ke akaun anda " + REFUND_TIME + "." + CLOSE,
     "FEE_DISPUTE.REFUND.waived": OPEN
-    + "Kami telah menyemak transaksi yuran {txn} sebanyak {charged} pada {date}. Tiada yuran sepatutnya dikenakan ke "
-    "atas akaun anda, maka jumlah {refund} akan dikreditkan semula " + REFUND_TIME + "." + CLOSE,
+    + "Kami telah menyemak transaksi yuran {txn} sebanyak {charged} pada {date}. {waiver_reason}, maka jumlah {refund} "
+    "akan dikreditkan semula " + REFUND_TIME + "." + CLOSE,
     "FEE_DISPUTE.DECLINE": OPEN
     + "Kami telah menyemak transaksi yuran {txn} sebanyak {charged} pada {date}. Yuran tersebut adalah mengikut jadual "
     "yuran bagi akaun anda, jadi kami tidak dapat memulangkan wang tersebut. {redress_bnm}" + CLOSE,

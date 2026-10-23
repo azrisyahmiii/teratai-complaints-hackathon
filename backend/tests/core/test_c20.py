@@ -152,3 +152,37 @@ def test_negated_malay_refund_is_not_a_promise(sentence: str, flagged: bool) -> 
     assert facts.outcome == "DECLINE"
     issues = check.check_reply(sentence, facts).issues
     assert any(i.code == "OUTCOME" for i in issues) is flagged
+
+
+# --- §9 #5a: a waived fee says why (a final decision gives its reason) ---------------------------------------------
+@pytest.mark.parametrize(
+    "complaint_id, waiver, cue",
+    [
+        ("CMP-00090", "age", "aged 60 and above"),
+        ("CMP-00310", "age", "berumur 60 tahun ke atas"),
+        ("CMP-00077", "first_year", "credit card's first year"),
+        ("CMP-00401", "first_year", "tahun pertama kad kredit"),
+        ("CMP-00161", "not_applicable", "does not apply to Basic Savings accounts"),
+        ("CMP-00154", "not_applicable", "tidak terpakai bagi akaun Basic Savings"),
+    ],
+)
+def test_waived_fee_reply_states_the_reason(complaint_id: str, waiver: str, cue: str) -> None:
+    from teratai import data, reply
+    from teratai.templates import render
+
+    d = process_complaint(data.complaint(complaint_id), "eval")
+    assert d.outcome == "REFUND" and d.facts.ids["waiver"] == waiver
+    assert cue in render(d.facts) and cue in reply.fact_sheet_text(d.facts)
+    assert d.check_ok
+
+
+def test_fee_refund_with_something_due_has_no_waiver_reason() -> None:
+    from teratai import data
+
+    for lb in data.labels().values():
+        if lb.category == "FEE_DISPUTE" and lb.outcome == "REFUND":
+            d = process_complaint(data.complaint(lb.complaint_id), "eval")
+            if d.facts.amounts["due"] > 0:
+                assert "waiver" not in d.facts.ids
+                return
+    raise AssertionError("no fee refund with a fee due")

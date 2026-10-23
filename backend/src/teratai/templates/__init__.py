@@ -64,6 +64,13 @@ def who(facts: FactSheet) -> str:
     return " ".join(p for p in (facts.honorific, facts.customer_name) if p)
 
 
+def waiver_reason(facts: FactSheet) -> str:
+    """Why no fee was due, in the reply language (FactSheet.ids["waiver"]; an unknown or missing reason says only that)."""
+    reasons = _LANGS[facts.language].WAIVER_REASONS
+    text: str = reasons.get(facts.ids.get("waiver", ""), reasons[""])
+    return text.format(waiver_age=config.DEBIT_FEE_WAIVER_AGE, product=facts.ids.get("product", ""))
+
+
 def context(facts: FactSheet) -> dict[str, str]:
     """Every placeholder a template may use. Keys with no data are absent (the template then falls back to GENERIC)."""
     lg = facts.language
@@ -79,6 +86,7 @@ def context(facts: FactSheet) -> dict[str, str]:
         "at": "",
         "to": "",
     }
+    ctx["waiver_reason"] = waiver_reason(facts)
     merchant = facts.ids.get("merchant", "")
     if merchant:
         ctx["at"], ctx["to"] = _AT[lg].format(merchant), _TO[lg].format(merchant)

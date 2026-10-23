@@ -22,6 +22,14 @@ SCAM_HELP = (
     "Please also call the National Scam Response Centre (NSRC) at 997 and, if advised, lodge a police report."
 )
 REFUND_TIME = "within {sla_days} working days"
+# Why no fee was due (FactSheet.ids["waiver"], set by reply._fee). A final decision states its reason (BNM).
+WAIVER_REASONS = {
+    "age": "No fee was due on your account, as the annual debit card fee is waived for customers aged {waiver_age} "
+    "and above",
+    "first_year": "No fee was due on your account, as the annual fee is waived in your credit card's first year",
+    "not_applicable": "No fee was due, as this fee does not apply to {product} accounts",
+    "": "No fee was due on your account",
+}
 
 TEXTS: dict[str, str] = {
     "DUPLICATE_CHARGE.REFUND": OPEN
@@ -68,8 +76,8 @@ TEXTS: dict[str, str] = {
     + "We reviewed fee transaction {txn} of {charged} on {date}. The fee due on your account was {due}. We will "
     "refund the difference of {refund} " + REFUND_TIME + "." + CLOSE,
     "FEE_DISPUTE.REFUND.waived": OPEN
-    + "We reviewed fee transaction {txn} of {charged} on {date}. No fee was due on your account, so we will refund "
-    "{refund} " + REFUND_TIME + "." + CLOSE,
+    + "We reviewed fee transaction {txn} of {charged} on {date}. {waiver_reason}, so we will refund {refund} "
+    + REFUND_TIME + "." + CLOSE,
     "FEE_DISPUTE.DECLINE": OPEN
     + "We reviewed fee transaction {txn} of {charged} on {date}. The fee is in line with our fee schedule for your "
     "account, so we are unable to refund it. {redress_bnm}" + CLOSE,
